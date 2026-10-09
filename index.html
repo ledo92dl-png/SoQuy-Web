@@ -1,0 +1,477 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#155e4a"><link rel="manifest" href="manifest.json"><title>Sổ Quỹ 2.1.2 - Web và khôi phục mật khẩu</title><style>*{box-sizing:border-box}body{margin:0;background:#f4f7f5;font:15px system-ui,Arial;color:#18332b}header{background:#155e4a;color:white;padding:18px 5%;display:flex;justify-content:space-between;align-items:center}h1{font-size:24px;margin:0}main{max-width:1050px;margin:auto;padding:18px}nav{display:flex;gap:8px;overflow:auto;padding:10px 0}button,.btn{border:0;background:#155e4a;color:white;border-radius:10px;padding:11px 14px;cursor:pointer;font:inherit}button.alt{background:#e3ede8;color:#174936}button.danger{background:#ad3535}.active{background:#155e4a!important;color:white!important}.card{background:white;border:1px solid #dce7e0;border-radius:15px;padding:17px;margin:12px 0;box-shadow:0 2px 8px #173d2910}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}.value{font-size:24px;font-weight:750;margin:8px 0}.muted{color:#65766d;font-size:13px}label{display:block;margin:12px 0 5px;font-weight:600}input,select,textarea{width:100%;padding:11px;border:1px solid #c8d7ce;border-radius:9px;font:inherit;background:white}table{width:100%;border-collapse:collapse}th,td{text-align:left;border-bottom:1px solid #e8eeea;padding:10px 7px}th{font-size:13px;color:#53675a}.scroll{overflow-x:auto}.positive{color:#14834e}.negative{color:#c34848}.toolbar{display:flex;flex-wrap:wrap;gap:8px}.hidden{display:none!important}.notice{background:#fff5d8;border-radius:10px;padding:12px;margin:12px 0}small{color:#65766d}@media print{header,nav,.no-print,button{display:none!important}body{background:white}main{max-width:none}.card{box-shadow:none;break-inside:avoid}}@media(max-width:600px){header{padding:14px}main{padding:10px}th,td{font-size:12px}}.hero{background:#155e4a;color:white;border-radius:16px;padding:20px}.hero .muted{color:#c8e6d7}.hero .value{font-size:30px}.quick{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}.quick button{flex:1;min-width:130px;font-weight:700}.quick .income{background:#22814e}.quick .expense{background:#bd594d}.txrow{display:flex;gap:12px;align-items:center;justify-content:space-between;border-bottom:1px solid #e5eee8;padding:12px 0}.txrow:last-child{border:0}.txrow small{display:block;margin-top:4px}.summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.summary>div{background:#eef6f0;border-radius:12px;padding:13px}.summary strong{display:block;margin-top:7px;font-size:19px}.report-group{cursor:pointer}.report-group:hover{background:#eef7f0}@media(max-width:600px){.hero .value{font-size:25px}.summary strong{font-size:16px}}@media print{.notice,.quick,#homeFilterWrap,#reportFilters{display:none!important}}  .metric-label{font-size:12px;color:#65766d}.dashboard-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.dashboard-grid .card{margin:0}.quick3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}.quick3 button{padding:13px 6px}.section-title{margin-top:22px}@media(max-width:520px){.dashboard-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.quick3{grid-template-columns:1fr 1fr 1fr}.quick3 button{font-size:13px}} </style></head><body><header><h1>💼 Sổ Quỹ</h1><span id="status">Lưu trên thiết bị</span></header><main><div class="notice no-print">Bản Android 2.0.7 – Mobile UX: Quỹ & Tài khoản, nhập liệu tối giản. Có thể dùng ngoại tuyến; hãy sao lưu JSON trước khi bật đồng bộ đám mây.</div><nav class="no-print" id="tabs"><button data-tab="overview">🏠 Giao dịch & Tổng quan</button><button data-tab="funds">Các quỹ</button><button data-tab="accounts">Tài khoản tiền</button><button data-tab="transactions">➕ Thu / Chi</button><button data-tab="transfer">⇄ Chuyển tiền</button><button data-tab="debts">📒 Công nợ</button><button data-tab="investments">📈 Đầu tư</button><button data-tab="reports">Báo cáo</button><button data-tab="backup">Sao lưu</button></nav><section id="overview"></section><section id="funds" class="hidden"></section><section id="accounts" class="hidden"></section><section id="transactions" class="hidden"></section><section id="transfer" class="hidden"></section><section id="debts" class="hidden"></section><section id="investments" class="hidden"></section><section id="reports" class="hidden"></section><section id="backup" class="hidden"></section><section id="cloud" class="hidden"></section></main><script src="finance-core-v2.js"></script><script>
+const KEY='soquy_v1';const seed=()=>({schemaVersion:2,funds:[{id:'f1',name:'Cá nhân',scope:'personal'},{id:'f2',name:'Quỹ CLB',scope:'shared'},{id:'f3',name:'Quỹ Cúng Tổ',scope:'shared'},{id:'f4',name:'Quỹ Lớp',scope:'shared'},{id:'f5',name:'Quỹ Gia đình',scope:'shared'}],accounts:[{id:'a1',name:'Tiền mặt',kind:'cash',openingBalance:0,liquid:true},{id:'a2',name:'Ngân hàng',kind:'bank',openingBalance:0,liquid:true}],tx:[],codes:[],partners:[],debts:[],investments:[]});let db;try{db=SoQuyFinanceV2.migrateDb(JSON.parse(localStorage.getItem(KEY))||seed())}catch{db=seed()}localStorage.setItem(KEY,JSON.stringify(db));let tab='overview',homeFund='',homeMonth=new Date().toLocaleDateString('en-CA').slice(0,7),quickType='expense',reportMode='detail';const money=n=>new Intl.NumberFormat('vi-VN',{style:'currency',currency:'VND',maximumFractionDigits:0}).format(n||0),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),id=()=>crypto.randomUUID?.()||Date.now()+'_'+Math.random(),today=()=>new Date().toLocaleDateString('en-CA');let localMutation=0;function save(){localMutation++;localStorage.setItem(KEY,JSON.stringify(db));localStorage.setItem(DIRTY_KEY,'1');render();bgSavePending();scheduleSync()}function name(list,key){return list.find(x=>x.id===key)?.name||'Đã xóa'}function balances(){
+ const fa={},aa={},matrix={};
+ db.funds.forEach(f=>fa[f.id]=0);
+ db.accounts.forEach(a=>{aa[a.id]=0;matrix[a.id]={};db.funds.forEach(f=>matrix[a.id][f.id]=0)});
+ const add=(account,fund,value)=>{if(!matrix[account]||matrix[account][fund]===undefined)return;matrix[account][fund]+=value;aa[account]+=value;fa[fund]+=value};
+ const legacy=[];
+ for(const t of db.tx){const v=Number(t.amount);
+  if(t.type==='income')add(t.account,t.fund,v);
+  else if(t.type==='expense')add(t.account,t.fund,-v);
+  else if(t.type==='fund_transfer'){if(t.account){add(t.account,t.fund,-v);add(t.account,t.toFund,v)}else legacy.push(t)}
+  else if(t.type==='account_transfer'){if(t.fund){add(t.account,t.fund,-v);add(t.toAccount,t.fund,v)}else legacy.push(t)}
+ }
+ return {fa,aa,matrix,legacy};
+}
+function opts(items){return items.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}function switchTab(t){tab=t;render()}document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));function render(){document.querySelectorAll('main>section').forEach(s=>s.classList.toggle('hidden',s.id!==tab));document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));const {fa,aa,matrix,legacy}=balances();let total=Object.values(fa).reduce((a,b)=>a+b,0);document.getElementById('overview').innerHTML=`<h2>Giao dịch & Tổng quan</h2><div id="homeFilterWrap" class="card no-print"><label>Quỹ đang làm việc</label><select id="homeFund" onchange="homeFund=this.value;render()"><option value="">Tất cả các quỹ</option>${db.funds.map(f=>`<option value="${esc(f.id)}" ${homeFund===f.id?'selected':''}>${esc(f.name)}</option>`).join('')}</select><label>Tháng</label><input type="month" value="${homeMonth}" onchange="homeMonth=this.value;render()"></div>${homeView(fa,total)}`;document.getElementById('funds').innerHTML=`<h2>Các quỹ</h2><div class="grid">${db.funds.map(f=>`<div class="card"><b>${esc(f.name)}</b><div class="value">${money(fa[f.id])}</div><button class="alt" onclick="showFund('${f.id}')">Xem chi tiết</button></div>`).join('')}</div><div class="card no-print"><h3>Thêm quỹ</h3><form onsubmit="addFund(event)"><input id="fundName" maxlength="70" required placeholder="Tên quỹ mới"><p><button>Thêm quỹ</button></p></form></div><div id="fundDetail"></div>`;document.getElementById('accounts').innerHTML=`<h2>Tài khoản tiền</h2>${legacy.length?`<div class="notice">Có ${legacy.length} giao dịch chuyển tiền cũ thiếu thông tin quỹ/tài khoản. Hãy sao lưu, sau đó xóa và nhập lại các giao dịch chuyển tiền đó để số dư chính xác.</div>`:''}<div class="grid">${db.accounts.map(a=>`<div class="card"><b>${esc(a.name)}</b><div class="value">${money(aa[a.id])}</div><div class="muted">${db.funds.map(f=>`${esc(f.name)}: ${money(matrix[a.id][f.id])}`).join('<br>')}</div></div>`).join('')}</div><div class="card no-print"><h3>Thêm tài khoản</h3><form onsubmit="addAccount(event)"><input id="accountName" maxlength="70" required placeholder="VD: Vietcombank, Ví MoMo"><p><button>Thêm tài khoản</button></p></form></div>`;document.getElementById('transactions').innerHTML=`<h2>Ghi giao dịch</h2><div class="card no-print"><form onsubmit="addTx(event)"><label>Loại giao dịch</label><select id="type" onchange="updateFields()"><option value="expense">Chi</option><option value="income">Thu</option><option value="fund_transfer">Chuyển giữa các quỹ (trong cùng tài khoản)</option><option value="account_transfer">Chuyển giữa các tài khoản (trong cùng quỹ)</option></select><div class="grid"><div><label>Ngày</label><input id="date" type="date" required value="${today()}"></div><div><label>Số tiền (VND)</label><input id="amount" type="number" min="1" step="1" required></div><div id="fundBox"><label>Quỹ</label><select id="fund">${opts(db.funds)}</select></div><div id="toFundBox" class="hidden"><label>Quỹ nhận</label><select id="toFund">${opts(db.funds)}</select></div><div id="accountBox"><label>Tài khoản tiền</label><select id="account">${opts(db.accounts)}</select></div><div id="toAccountBox" class="hidden"><label>Tài khoản nhận</label><select id="toAccount">${opts(db.accounts)}</select></div></div><label>Nội dung thu / chi</label><input id="category" list="categorySuggestions" maxlength="100" placeholder="Ăn uống, hội phí, sân bãi..."><datalist id="categorySuggestions">${suggestions()}</datalist><label>Ghi chú</label><textarea id="note" maxlength="500" rows="2"></textarea><p><button>Lưu giao dịch</button></p></form></div><h2>Lịch sử</h2>${txTable([...db.tx].reverse(),true)}`;document.getElementById('reports').innerHTML=`<h2>Báo cáo</h2><div class="card no-print" id="reportFilters"><label>Quỹ</label><select id="reportFund" onchange="drawReport()"><option value="">Tất cả quỹ</option>${opts(db.funds)}</select><div class="grid"><div><label>Từ ngày</label><input type="date" id="from" onchange="drawReport()"></div><div><label>Đến ngày</label><input type="date" id="to" onchange="drawReport()"></div></div><label>Kiểu báo cáo</label><select id="reportMode" onchange="reportMode=this.value;drawReport()"><option value="detail" ${reportMode==='detail'?'selected':''}>Chi tiết giao dịch</option><option value="group" ${reportMode==='group'?'selected':''}>Tổng hợp theo nội dung</option></select><p class="toolbar"><button onclick="exportCsv()">Xuất Excel (CSV)</button><button class="alt" onclick="window.print()">In / Lưu PDF</button></p></div><div id="reportResult"></div>`;document.getElementById('backup').innerHTML=`<h2>Sao lưu dữ liệu</h2><div class="card"><p>Dữ liệu chỉ nằm trong trình duyệt trên thiết bị này. Hãy xuất bản sao lưu JSON và cất ở nơi an toàn. Không xóa dữ liệu trình duyệt trước khi sao lưu.</p><div class="toolbar no-print"><button onclick="backup()">Tải bản sao lưu JSON</button><label class="btn" style="margin:0">Khôi phục từ JSON<input type="file" accept="application/json,.json" style="display:none" onchange="restore(event)"></label></div></div>`;document.getElementById('cloud').innerHTML=cloudView();if(tab==='reports')drawReport();if(tab==='transactions')updateFields()}
+function homeView(fa,total){let arr=db.tx.filter(t=>(!homeFund||t.fund===homeFund||t.toFund===homeFund)&&(!homeMonth||t.date?.startsWith(homeMonth)));let inc=arr.filter(t=>t.type==='income').reduce((n,t)=>n+Number(t.amount),0),exp=arr.filter(t=>t.type==='expense').reduce((n,t)=>n+Number(t.amount),0);let bal=homeFund?fa[homeFund]||0:total;return `<div class="hero"><div class="muted">${homeFund?esc(name(db.funds,homeFund)):'Tổng số dư các quỹ'}</div><div class="value">${money(bal)}</div><div class="summary"><div><span class="muted">Thu tháng</span><strong>${money(inc)}</strong></div><div><span class="muted">Chi tháng</span><strong>${money(exp)}</strong></div></div></div><div class="quick no-print"><button class="income" onclick="quickAdd('income')">＋ Thêm khoản thu</button><button class="expense" onclick="quickAdd('expense')">－ Thêm khoản chi</button></div><h3>Giao dịch gần đây</h3><div class="card">${arr.slice().reverse().slice(0,12).map(t=>`<div class="txrow"><div><b>${esc(t.category||({income:'Thu',expense:'Chi',fund_transfer:'Chuyển quỹ',account_transfer:'Chuyển tài khoản'})[t.type])}</b><small>${esc(t.date)} · ${esc(name(db.funds,t.fund))} · ${esc(name(db.accounts,t.account))}</small></div><b class="${t.type==='income'?'positive':t.type==='expense'?'negative':''}">${t.type==='income'?'+':t.type==='expense'?'−':''}${money(t.amount)}</b></div>`).join('')||'<p class="muted">Chưa có giao dịch trong kỳ.</p>'}</div><button class="alt no-print" onclick="switchTab('transactions')">Xem tất cả giao dịch</button>`}
+function quickAdd(kind){quickType=kind;tab='transactions';render();document.getElementById('type').value=kind;if(homeFund&&db.funds.some(f=>f.id===homeFund))document.getElementById('fund').value=homeFund;updateFields();document.getElementById('amount').focus();window.scrollTo({top:0,behavior:'smooth'})}
+function norm(s){return String(s||'').normalize('NFC').trim().replace(/\s+/g,' ').toLocaleLowerCase('vi-VN')}
+function suggestions(){return [...new Map(db.tx.filter(t=>['income','expense'].includes(t.type)&&t.category?.trim()).map(t=>[norm(t.category),t.category.trim()])).values()].sort((a,b)=>a.localeCompare(b,'vi')).map(x=>`<option value="${esc(x)}"></option>`).join('')}
+function txTable(arr,del=false){return `<div class="card scroll"><table><thead><tr><th>Ngày</th><th>Loại</th><th>Quỹ</th><th>Tài khoản</th><th>Nội dung</th><th>Số tiền</th>${del?'<th class="no-print">Xóa</th>':''}</tr></thead><tbody>${arr.map(t=>`<tr><td>${esc(t.date)}</td><td>${({income:'Thu',expense:'Chi',fund_transfer:'Chuyển quỹ',account_transfer:'Chuyển tài khoản'})[t.type]}</td><td>${esc(name(db.funds,t.fund))}${t.toFund?' → '+esc(name(db.funds,t.toFund)):''}</td><td>${esc(name(db.accounts,t.account))}${t.toAccount?' → '+esc(name(db.accounts,t.toAccount)):''}</td><td>${esc(t.category)}${t.note?'<br><small>'+esc(t.note)+'</small>':''}</td><td class="${t.type==='income'?'positive':t.type==='expense'?'negative':''}">${money(t.amount)}</td>${del?`<td class="no-print"><button class="danger" onclick="removeTx('${t.id}')">Xóa</button></td>`:''}</tr>`).join('')||`<tr><td colspan="7">Chưa có giao dịch</td></tr>`}</tbody></table></div>`}
+function showFund(fid){let f=db.funds.find(x=>x.id===fid);if(!f)return;let {fa}=balances();document.getElementById('fundDetail').innerHTML=`<div class="card"><h2>${esc(f.name)}</h2><div class="value">${money(fa[fid])}</div><h3>Lịch sử quỹ</h3>${txTable(db.tx.filter(t=>t.fund===fid||t.toFund===fid).reverse())}</div>`;document.getElementById('fundDetail').scrollIntoView({behavior:'smooth'})}function addFund(e){e.preventDefault();let n=document.getElementById('fundName').value.trim();if(!n)return;if(db.funds.some(f=>f.name.toLowerCase()===n.toLowerCase()))return alert('Quỹ đã tồn tại');db.funds.push({id:id(),name:n});save()}function addAccount(e){e.preventDefault();let n=document.getElementById('accountName').value.trim();if(!n)return;if(db.accounts.some(a=>a.name.toLowerCase()===n.toLowerCase()))return alert('Tài khoản đã tồn tại');db.accounts.push({id:id(),name:n});save()}function updateFields(){let t=document.getElementById('type')?.value;if(!t)return;document.getElementById('fundBox').classList.remove('hidden');document.getElementById('accountBox').classList.remove('hidden');document.getElementById('toFundBox').classList.toggle('hidden',t!=='fund_transfer');document.getElementById('toAccountBox').classList.toggle('hidden',t!=='account_transfer')}
+function addTx(e){e.preventDefault();let v=Number(document.getElementById('amount').value),t={id:id(),type:document.getElementById('type').value,date:document.getElementById('date').value,amount:v,fund:document.getElementById('fund').value,account:document.getElementById('account').value,category:document.getElementById('category').value.trim(),note:document.getElementById('note').value.trim()};if(!Number.isSafeInteger(v)||v<=0)return alert('Số tiền phải là số nguyên dương');if(t.type==='fund_transfer'){t.toFund=document.getElementById('toFund').value;if(t.fund===t.toFund)return alert('Chọn hai quỹ khác nhau')}if(t.type==='account_transfer'){t.toAccount=document.getElementById('toAccount').value;if(t.account===t.toAccount)return alert('Chọn hai tài khoản khác nhau')}db.tx.push(t);save();alert('Đã lưu giao dịch trên thiết bị')}
+function removeTx(x){if(confirm('Xóa giao dịch này?')){db.tx=db.tx.filter(t=>t.id!==x);save()}}function filtered(){let f=document.getElementById('reportFund').value,from=document.getElementById('from').value,to=document.getElementById('to').value;return db.tx.filter(t=>(!f||t.fund===f||t.toFund===f)&&(!from||t.date>=from)&&(!to||t.date<=to))}function grouped(){let map=new Map();for(let t of filtered()){if(!['income','expense'].includes(t.type))continue;let key=t.type+'|'+norm(t.category||'Chưa ghi nội dung');if(!map.has(key))map.set(key,{type:t.type,category:(t.category||'Chưa ghi nội dung').trim(),count:0,amount:0,ids:[]});let g=map.get(key);g.count++;g.amount+=Number(t.amount);g.ids.push(t.id)}return [...map.values()].sort((a,b)=>a.type.localeCompare(b.type)||b.amount-a.amount)}
+function showGroupIndex(index){let g=grouped()[index];if(!g)return;document.getElementById('groupDetail').innerHTML=`<h3>Chi tiết: ${esc(g.category)} (${g.count} lần)</h3>${txTable(db.tx.filter(t=>g.ids.includes(t.id)).reverse())}`;document.getElementById('groupDetail').scrollIntoView({behavior:'smooth'})}
+function drawReport(){let arr=filtered(),inc=arr.filter(t=>t.type==='income').reduce((s,t)=>s+Number(t.amount),0),exp=arr.filter(t=>t.type==='expense').reduce((s,t)=>s+Number(t.amount),0);let groups=grouped();document.getElementById('reportResult').innerHTML=`<div class="grid"><div class="card"><div>Thu</div><div class="value positive">${money(inc)}</div></div><div class="card"><div>Chi</div><div class="value negative">${money(exp)}</div></div><div class="card"><div>Chênh lệch thu chi</div><div class="value">${money(inc-exp)}</div></div></div>${reportMode==='group'?`<div class="card scroll"><h3>Tổng hợp theo nội dung</h3><p class="muted">Nhấn vào nội dung để xem các giao dịch. Khoản chuyển quỹ/tài khoản không tính là thu chi.</p><table><thead><tr><th>Loại</th><th>Nội dung</th><th>Số lần</th><th>Tổng tiền</th></tr></thead><tbody>${groups.map(g=>`<tr class="report-group" onclick="showGroupIndex(${groups.indexOf(g)})"><td>${g.type==='income'?'Thu':'Chi'}</td><td>${esc(g.category)}</td><td>${g.count}</td><td>${money(g.amount)}</td></tr>`).join('')||'<tr><td colspan="4">Chưa có giao dịch</td></tr>'}</tbody></table></div><div id="groupDetail"></div>`:txTable([...arr].reverse())}`}
+function download(content,filename,mime){let a=document.createElement('a'),u=URL.createObjectURL(new Blob([content],{type:mime}));a.href=u;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
+function exportCsv(){let rows=reportMode==='group'?[['Loại','Nội dung','Số lần','Tổng tiền'],...grouped().map(g=>[g.type==='income'?'Thu':'Chi',g.category,g.count,g.amount])]:[['Ngày','Loại','Quỹ','Quỹ nhận','Tài khoản','Tài khoản nhận','Nội dung','Số tiền','Ghi chú'],...filtered().map(t=>[t.date,t.type,name(db.funds,t.fund),t.toFund?name(db.funds,t.toFund):'',name(db.accounts,t.account),t.toAccount?name(db.accounts,t.toAccount):'',t.category,t.amount,t.note])];download('\ufeff'+rows.map(r=>r.map(v=>'"'+String(v??'').replaceAll('"','""')+'"').join(',')).join('\r\n'),'so-quy-'+(reportMode==='group'?'tong-hop-noi-dung':'chi-tiet')+'.csv','text/csv;charset=utf-8')}
+function backup(){download(JSON.stringify(db,null,2),'so-quy-sao-luu-'+today()+'.json','application/json')}async function restore(e){let file=e.target.files[0];if(!file)return;try{let data=JSON.parse(await file.text());if(!Array.isArray(data.funds)||!Array.isArray(data.accounts)||!Array.isArray(data.tx))throw Error();if(!confirm('Khôi phục sẽ thay thế TOÀN BỘ dữ liệu hiện tại. Bạn đã sao lưu dữ liệu cũ chưa?'))return;db=data;save();alert('Đã khôi phục. Nếu đang dùng đám mây, hãy kiểm tra dữ liệu và bấm Đồng bộ lên đám mây.')}catch{alert('Tệp sao lưu không hợp lệ')}}
+
+
+// Three-way merge by stable ID. Independent offline additions are combined.
+function mergeData(base,local,remote){
+ const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+ const mergeList=(field)=>{
+  const b=new Map((base?.[field]||[]).map(x=>[x.id,x]));
+  const l=new Map((local?.[field]||[]).map(x=>[x.id,x]));
+  const r=new Map((remote?.[field]||[]).map(x=>[x.id,x]));
+  const result=[];
+  for(const key of new Set([...r.keys(),...l.keys(),...b.keys()])){
+   const bv=b.get(key),lv=l.get(key),rv=r.get(key);
+   let chosen;
+   if(same(lv,rv))chosen=lv;
+   else if(same(lv,bv))chosen=rv;
+   else if(same(rv,bv))chosen=lv;
+   else if(bv===undefined&&lv!==undefined&&rv===undefined)chosen=lv;
+   else if(bv===undefined&&rv!==undefined&&lv===undefined)chosen=rv;
+   else throw Error('XUNG ĐỘT: cùng chỉnh sửa '+field+' / '+key+'. Hãy sao lưu JSON để đối chiếu.');
+   if(chosen!==undefined)result.push(chosen);
+  }
+  return result;
+ };
+ return SoQuyFinanceV2.migrateDb({schemaVersion:2,funds:mergeList('funds'),accounts:mergeList('accounts'),tx:mergeList('tx'),codes:mergeList('codes'),partners:mergeList('partners'),debts:mergeList('debts'),investments:mergeList('investments')});
+}
+
+// Background Sync bridge: durable pending snapshot; no background read of localStorage.
+const BG_DB='soquy-background-v133',BG_STORE='state';let bgSerial=Promise.resolve();
+function bgOpen(){return new Promise((resolve,reject)=>{const r=indexedDB.open(BG_DB,1);r.onupgradeneeded=()=>r.result.createObjectStore(BG_STORE);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
+async function bgGet(key){const d=await bgOpen();return new Promise((resolve,reject)=>{const t=d.transaction(BG_STORE,'readonly'),r=t.objectStore(BG_STORE).get(key);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);t.oncomplete=()=>d.close()})}
+async function bgPut(key,value){const d=await bgOpen();return new Promise((resolve,reject)=>{const t=d.transaction(BG_STORE,'readwrite');t.objectStore(BG_STORE).put(value,key);t.oncomplete=()=>{d.close();resolve()};t.onerror=()=>reject(t.error)})}
+async function bgDelete(key){const d=await bgOpen();return new Promise((resolve,reject)=>{const t=d.transaction(BG_STORE,'readwrite');t.objectStore(BG_STORE).delete(key);t.oncomplete=()=>{d.close();resolve()};t.onerror=()=>reject(t.error)})}
+function bgQueue(task){bgSerial=bgSerial.catch(()=>{}).then(task).catch(e=>console.warn('Lỗi hàng đợi nền:',e));return bgSerial}
+async function bgRegister(){if(!('serviceWorker'in navigator))return;try{const reg=await navigator.serviceWorker.ready;if('sync'in reg)await reg.sync.register('soquy-upload-v133')}catch(e){console.warn('Thiết bị chưa hỗ trợ đồng bộ nền:',e)}}
+function bgSavePending(){const data=JSON.stringify(db),known=Number(localStorage.getItem(REV_KEY)||0);return bgQueue(async()=>{await bgPut('pending',{data,known,base:localStorage.getItem(BASE_KEY),at:Date.now()});await bgRegister();if(window.AndroidSync)AndroidSync.pending(JSON.stringify({data,known,base:localStorage.getItem(BASE_KEY),at:Date.now()}))})}
+function bgStoreAuth(){return bgQueue(async()=>{if(!cloudConfig||!cloudRefreshToken||!cloudToken)return;await bgPut('auth',{url:cloudConfig.url,key:cloudConfig.key,access:cloudToken,refresh:cloudRefreshToken,expires:cloudExpiresAt,user:cloudUser});if(window.AndroidSync)AndroidSync.auth(JSON.stringify({url:cloudConfig.url,key:cloudConfig.key,access:cloudToken,refresh:cloudRefreshToken,expires:cloudExpiresAt,user:cloudUser}))})}
+async function bgReconcile(){
+ try{
+  const result=await bgGet('uploaded');if(!result)return;
+  const known=Number(localStorage.getItem(REV_KEY)||0);
+  if(result.known!==known){
+    // An older background result cannot safely advance a different local baseline.
+    if(Number(result.revision)===known){await bgDelete('uploaded');return;}
+    throw Error('Phiên bản đồng bộ nền khác bản đang dùng; hãy giữ bản sao lưu và kiểm tra trên hai thiết bị.');
+   }
+  const uploaded=JSON.parse(result.data);
+  const base=result.source?JSON.parse(result.source):uploaded;
+  const merged=mergeData(base,db,uploaded);
+  const changed=JSON.stringify(merged)!==JSON.stringify(uploaded);
+  db=merged;localStorage.setItem(KEY,JSON.stringify(db));
+  localStorage.setItem(REV_KEY,String(result.revision));
+  localStorage.setItem(BASE_KEY,JSON.stringify(uploaded));
+  if(changed){localStorage.setItem(DIRTY_KEY,'1');await bgPut('pending',{data:JSON.stringify(db),known:result.revision,base:JSON.stringify(uploaded),at:Date.now()});}
+  else{localStorage.removeItem(DIRTY_KEY);await bgDelete('pending')}
+  await bgDelete('uploaded');render();
+  const auth=await bgGet('auth');
+  if(auth?.refresh&&auth.url===cloudConfig?.url&&auth.refresh!==cloudRefreshToken){
+   cloudToken=auth.access;cloudRefreshToken=auth.refresh;cloudExpiresAt=auth.expires;
+   localStorage.setItem(SESSION_KEY,JSON.stringify({access_token:cloudToken,refresh_token:cloudRefreshToken,expires_at:cloudExpiresAt,user:cloudUser}));
+  }
+ }catch(e){showCloudStatus('Cần đối chiếu đồng bộ nền: '+e.message)}
+}
+async function bgClearSynced(snapshot){if(window.AndroidSync)AndroidSync.clearPending(snapshot);try{const p=await bgGet('pending');if(p?.data===snapshot)await bgDelete('pending')}catch(e){console.warn(e)}}
+
+// Supabase REST + Auth. Khong dua service_role vao trinh duyet.
+const CONFIG_KEY='soquy_cloud_config_v13',DIRTY_KEY='soquy_dirty_v13',REV_KEY='soquy_revision_v13';
+const BASE_KEY='soquy_base_v14';const SESSION_KEY='soquy_session_v131',OLD_SESSION_KEY='soquy_session';
+let cloudConfig=null;try{cloudConfig=JSON.parse(localStorage.getItem(CONFIG_KEY)||'null')}catch{}
+let cloudToken='',cloudRefreshToken='',cloudExpiresAt=0,cloudUser='',cloudBusy=false,cloudTimer=null,cloudStatus='Chưa kết nối',refreshPromise=null,syncAgain=false;
+const dirty=()=>localStorage.getItem(DIRTY_KEY)==='1';
+function cloudView(){return `<h2>☁️ Đồng bộ dữ liệu</h2><div class="card"><b>Trạng thái: ${esc(cloudStatus)}</b><p class="muted">${dirty()?'Có thay đổi trên thiết bị chưa đồng bộ.':'Không có thay đổi đang chờ.'} Phiên bản dữ liệu đám mây đã biết: ${esc(localStorage.getItem(REV_KEY)||'chưa có')}</p><p class="muted">Tự kiểm tra mỗi 15 giây khi ứng dụng đang mở; kiểm tra ngay khi mở lại hoặc có Internet. Giao dịch mới độc lập trên hai thiết bị được hợp nhất tự động khi có mạng và ứng dụng mở; cùng sửa một giao dịch sẽ yêu cầu đối chiếu. Đồng bộ nền tùy trình duyệt, không bảo đảm khi đã đóng ứng dụng.</p><p class="notice">Hãy sao lưu JSON định kỳ. Có thể nhập giao dịch mới trên cả hai thiết bị khi mất mạng.</p></div><div class="card"><h3>1. Cấu hình Supabase</h3><label>Project URL</label><input id="cloudUrl" placeholder="https://xxxx.supabase.co" value="${esc(cloudConfig?.url||'')}"><label>Publishable / anon key</label><input id="cloudKey" type="password" value="${esc(cloudConfig?.key||'')}"><p><button onclick="saveCloudConfig()">Lưu cấu hình</button></p></div><div class="card"><h3>2. Đăng nhập</h3><label>Email</label><input type="email" id="cloudEmail" autocomplete="email"><label>Mật khẩu</label><input type="password" id="cloudPassword" autocomplete="current-password"><p class="toolbar"><button onclick="cloudAuth('signup')">Tạo tài khoản</button><button onclick="cloudAuth('login')">Đăng nhập</button><button class="alt" onclick="cloudLogout()">Đăng xuất</button></p><p class="muted">${cloudUser?'Đang đăng nhập: '+esc(cloudUser):'Chưa đăng nhập'} · Lưu phiên đăng nhập trên thiết bị này (không lưu mật khẩu). Chỉ dùng trên thiết bị cá nhân có khóa màn hình.</p></div><div class="card"><h3>3. Đồng bộ</h3><p class="toolbar"><button onclick="syncNow()">Đồng bộ ngay</button><button class="alt" onclick="downloadCloud()">Tải bản đám mây về thiết bị</button></p><p class="muted">Tải về chỉ cho phép khi không có thay đổi chưa đồng bộ.</p></div>`}
+function showCloudStatus(message){cloudStatus=message;document.getElementById('status').textContent=message;if(tab==='cloud')render()}
+function saveCloudConfig(){const url=document.getElementById('cloudUrl').value.trim().replace(/\/+$/,'');const key=document.getElementById('cloudKey').value.trim();if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url)||!key||key.includes('service_role')||key.startsWith('sb_secret_'))return alert('Nhập Project URL Supabase hợp lệ và publishable/anon key.');if(cloudConfig&&(cloudConfig.url!==url||cloudConfig.key!==key)){cloudLogout();localStorage.removeItem(REV_KEY)}cloudConfig={url,key};localStorage.setItem(CONFIG_KEY,JSON.stringify(cloudConfig));bgStoreAuth();showCloudStatus(cloudToken?'Đã lưu cấu hình':'Đã lưu cấu hình; cần đăng nhập')}
+function storeSession(data){cloudToken=data.access_token;cloudRefreshToken=data.refresh_token||cloudRefreshToken;cloudExpiresAt=data.expires_at||(Date.now()/1000+(data.expires_in||3600));cloudUser=data.user?.email||data.user||cloudUser;localStorage.setItem(SESSION_KEY,JSON.stringify({access_token:cloudToken,refresh_token:cloudRefreshToken,expires_at:cloudExpiresAt,user:cloudUser}));sessionStorage.removeItem(OLD_SESSION_KEY);bgStoreAuth()}
+async function refreshSession(){if(refreshPromise)return refreshPromise;if(!cloudRefreshToken)throw Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');refreshPromise=(async()=>{if(!cloudConfig)throw Error('Chưa cấu hình Supabase');const r=await fetch(cloudConfig.url+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{apikey:cloudConfig.key,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:cloudRefreshToken})});const d=await r.json();if(!r.ok||!d.access_token)throw Error(d.msg||d.error_description||'Không thể gia hạn đăng nhập');storeSession(d);return cloudToken})();try{return await refreshPromise}catch(e){cloudToken='';cloudRefreshToken='';localStorage.removeItem(SESSION_KEY);showCloudStatus('Cần đăng nhập lại: '+e.message);throw e}finally{refreshPromise=null}}
+async function cloudRequest(path,method='GET',body,auth=true,retry=true){if(!navigator.onLine)throw Error('Đang ngoại tuyến');if(!cloudConfig)throw Error('Chưa cấu hình Supabase');if(auth){if(!cloudToken)throw Error('Chưa đăng nhập');if(cloudRefreshToken&&Date.now()/1000>cloudExpiresAt-90)await refreshSession()}let h={'apikey':cloudConfig.key,'Content-Type':'application/json'};if(auth)h.Authorization='Bearer '+cloudToken;let r=await fetch(cloudConfig.url+path,{method,headers:h,body:body===undefined?undefined:JSON.stringify(body),cache:'no-store'});if(r.status===401&&auth&&retry&&cloudRefreshToken){await refreshSession();return cloudRequest(path,method,body,auth,false)}let raw=await r.text(),data;try{data=raw?JSON.parse(raw):null}catch{data=raw}if(!r.ok)throw Error(data?.msg||data?.message||data?.error_description||'Lỗi '+r.status);return data}
+async function cloudAuth(action){try{let email=document.getElementById('cloudEmail').value.trim(),password=document.getElementById('cloudPassword').value;if(!email||!password)throw Error('Nhập email và mật khẩu');let d=await cloudRequest('/auth/v1/'+(action==='signup'?'signup':'token?grant_type=password'),'POST',{email,password},false);if(!d.access_token){showCloudStatus('Đã gửi đăng ký. Kiểm tra email xác nhận, rồi đăng nhập.');return}storeSession(d);showCloudStatus('Đã đăng nhập');if(dirty())bgSavePending();await syncNow()}catch(e){alert(e.message)}}
+function cloudLogout(){if(window.AndroidSync)AndroidSync.logout();cloudToken='';cloudRefreshToken='';cloudExpiresAt=0;cloudUser='';localStorage.removeItem(SESSION_KEY);sessionStorage.removeItem(OLD_SESSION_KEY);bgQueue(()=>bgDelete('auth'));showCloudStatus('Đã đăng xuất')}
+function scheduleSync(){clearTimeout(cloudTimer);if(cloudToken&&navigator.onLine){if(cloudBusy){syncAgain=true;return}cloudTimer=setTimeout(()=>syncNow(),1200)}}
+async function fetchCloud(){let rows=await cloudRequest('/rest/v1/finance_snapshots?select=revision,data&limit=1');return rows?.[0]||null}
+function acceptRemote(remote){
+ if(dirty())throw Error('Có thay đổi cục bộ; không thể tự tải dữ liệu mới');
+ if(!remote?.data||!Array.isArray(remote.data.funds)||!Array.isArray(remote.data.accounts)||!Array.isArray(remote.data.tx))throw Error('Dữ liệu đám mây không hợp lệ');
+ db=remote.data;localStorage.setItem(KEY,JSON.stringify(db));
+ localStorage.setItem(REV_KEY,String(remote.revision));localStorage.setItem(BASE_KEY,JSON.stringify(db));render();
+}
+async function syncNow(){
+ if(cloudBusy){syncAgain=true;return}
+ if(!cloudToken||!navigator.onLine)return;
+ cloudBusy=true;
+ try{
+  await bgSerial;await bgReconcile();
+  for(let attempt=0;attempt<5;attempt++){
+   const mutation=localMutation;
+   const local=JSON.parse(JSON.stringify(db));
+   const known=Number(localStorage.getItem(REV_KEY)||0);
+   const remote=await fetchCloud();
+   if(mutation!==localMutation){syncAgain=true;return}
+   if(!remote){
+    if(known!==0)throw Error('Bản đám mây không còn tồn tại; cần đối chiếu trước khi tạo lại.');
+    const revision=await cloudRequest('/rest/v1/rpc/save_finance_snapshot','POST',{expected_revision:0,new_data:local});
+    localStorage.setItem(REV_KEY,String(revision));localStorage.setItem(BASE_KEY,JSON.stringify(local));
+    if(mutation===localMutation){localStorage.removeItem(DIRTY_KEY);await bgClearSynced(JSON.stringify(local))}
+    else syncAgain=true;
+    showCloudStatus('Đã tạo bản đám mây');return;
+   }
+   if(!dirty()){
+    if(Number(remote.revision)!==known){acceptRemote(remote);showCloudStatus('Đã tự cập nhật từ đám mây')}
+    else {localStorage.setItem(BASE_KEY,JSON.stringify(remote.data));showCloudStatus('Đã đồng bộ')}
+    return;
+   }
+   let base=null;
+   try{base=JSON.parse(localStorage.getItem(BASE_KEY)||'null')}catch{}
+   // Legacy migration: if no baseline exists, preserve additions on both devices.
+   // Deletions made before migration cannot be inferred; user backups remain available.
+   const merged=Number(remote.revision)===known?local:mergeData(base,local,remote.data);
+   if(mutation!==localMutation){syncAgain=true;return}
+   try{
+    const revision=await cloudRequest('/rest/v1/rpc/save_finance_snapshot','POST',{
+     expected_revision:Number(remote.revision),new_data:merged
+    });
+    localStorage.setItem(REV_KEY,String(revision));localStorage.setItem(BASE_KEY,JSON.stringify(merged));
+    if(mutation===localMutation){
+     db=merged;localStorage.setItem(KEY,JSON.stringify(db));localStorage.removeItem(DIRTY_KEY);
+     await bgClearSynced(JSON.stringify(local));render();
+     showCloudStatus('Đã hợp nhất và đồng bộ hai chiều');
+    }else{
+     // Keep new edits; incorporate remotely accepted data without overwriting them.
+     const latest=mergeData(local,db,merged);
+     db=latest;localStorage.setItem(KEY,JSON.stringify(db));
+     localStorage.setItem(DIRTY_KEY,'1');bgSavePending();syncAgain=true;
+     showCloudStatus('Đã đồng bộ; đang gửi thay đổi mới');
+    }
+    return;
+   }catch(e){
+    // Another device may have committed first. Refetch and retry CAS.
+    if(/revision|conflict|409|phiên bản|xung đột/i.test(e.message)&&attempt<4)continue;
+    throw e;
+   }
+  }
+  showCloudStatus('Đang có nhiều cập nhật đồng thời; sẽ thử lại');syncAgain=true;
+ }catch(e){showCloudStatus('Chưa đồng bộ: '+e.message)}
+ finally{cloudBusy=false;if(syncAgain){syncAgain=false;scheduleSync()}}
+}
+async function downloadCloud(){if(dirty())return alert('Thiết bị có dữ liệu chưa đồng bộ. Hãy sao lưu JSON và xử lý trước khi tải về.');if(!confirm('Tải dữ liệu đám mây về và thay thế dữ liệu trên thiết bị?'))return;try{let r=await fetchCloud();if(!r)throw Error('Đám mây chưa có dữ liệu');acceptRemote(r);showCloudStatus('Đã tải dữ liệu đám mây')}catch(e){alert(e.message)}}
+function initCloud(){try{let s=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');if(!s){let old=JSON.parse(sessionStorage.getItem(OLD_SESSION_KEY)||'null');if(old){cloudToken=old.access_token;cloudUser=old.user;showCloudStatus('Hãy đăng nhập lại một lần để bật tự động đăng nhập')}}else{cloudToken=s.access_token;cloudRefreshToken=s.refresh_token||'';cloudExpiresAt=s.expires_at||0;cloudUser=s.user||'';showCloudStatus('Đang kết nối đám mây');bgQueue(async()=>{await bgReconcile();if(dirty()&&!await bgGet('pending'))await bgPut('pending',{data:JSON.stringify(db),known:Number(localStorage.getItem(REV_KEY)||0),base:localStorage.getItem(BASE_KEY),at:Date.now()});await bgPut('auth',{url:cloudConfig?.url,key:cloudConfig?.key,access:cloudToken,refresh:cloudRefreshToken,expires:cloudExpiresAt,user:cloudUser})}).then(()=>{bgRegister();bgStoreAuth();if(dirty())bgSavePending();syncNow()}).catch(e=>showCloudStatus('Cần đối chiếu: '+e.message))}}catch{}window.addEventListener('online',()=>{showCloudStatus('Có Internet; đang kiểm tra đồng bộ');syncNow()});window.addEventListener('offline',()=>showCloudStatus('Ngoại tuyến; dữ liệu vẫn lưu trên thiết bị'));window.addEventListener('focus',()=>{if(cloudToken)syncNow()});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&cloudToken)syncNow()});setInterval(()=>{if(!document.hidden&&cloudToken&&navigator.onLine)syncNow()},15000)}
+
+// Native WorkManager receipt bridge. A receipt is consumed only on successful local reconciliation.
+async function soquyNativeResume(){
+ if(!window.AndroidSync)return;
+ const raw=AndroidSync.takeReceipt();if(!raw)return;
+ try{
+  const receipt=JSON.parse(raw);
+  if(Number(localStorage.getItem(REV_KEY)||0)===Number(receipt.known)){
+   await bgPut('uploaded',receipt);
+   await bgReconcile();
+  }
+  // If foreground has already advanced, its next cloud sync merges the native upload.
+  if(cloudToken)syncNow();
+ }catch(e){showCloudStatus('Cần kiểm tra đồng bộ Android: '+e.message)}
+}
+window.addEventListener('focus',()=>soquyNativeResume());
+
+
+// ===== Sổ Quỹ 2.0.2 mobile UI =====
+function typeLabel(t){return ({income:'Thu',expense:'Chi',fund_transfer:'Chuyển quỹ',account_transfer:'Chuyển tài khoản',loan_out:'Cho mượn',loan_repayment_in:'Thu hồi cho mượn',borrow_in:'Đi vay',debt_repayment_out:'Trả nợ',investment_buy:'Đầu tư',investment_redeem:'Thu hồi đầu tư'})[t]||t}
+function codeOptions(kind){let a=db.codes.filter(x=>!kind||!x.kind||x.kind===kind);return '<option value="">-- Không chọn --</option>'+a.map(x=>`<option value="${esc(x.code||x.id)}">${esc((x.code?x.code+' – ':'')+(x.name||x.code||''))}</option>`).join('')}
+function partnerOptions(){return '<option value="">-- Chọn người/đơn vị --</option>'+db.partners.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}
+function dashboard(){const f=SoQuyFinanceV2.calc(db),m=SoQuyFinanceV2.monthSummary(db,homeMonth);let personal=db.funds.filter(x=>x.scope!=='shared').reduce((s,x)=>s+(f.fund[x.id]||0),0),shared=db.funds.filter(x=>x.scope==='shared').reduce((s,x)=>s+(f.fund[x.id]||0),0);return `<h2>🏠 Tổng quan</h2><div class="card no-print"><label>Tháng đang xem</label><input type="month" value="${homeMonth}" onchange="homeMonth=this.value;render()"></div><div class="hero"><div class="muted">Tổng tài sản ước tính</div><div class="value">${money(f.totalAssets)}</div><div class="summary"><div><span class="muted">Tiền có thể chi ngay</span><strong>${money(f.liquidCash)}</strong></div><div><span class="muted">Đầu tư</span><strong>${money(f.investmentValue)}</strong></div></div></div><div class="quick3 no-print"><button onclick="quickAdd('income')">＋ Thu</button><button class="danger" onclick="quickAdd('expense')">− Chi</button><button class="alt" onclick="switchTab('transfer')">⇄ Chuyển</button></div><div class="dashboard-grid"><div class="card"><div class="metric-label">Tài sản cá nhân</div><div class="value">${money(personal)}</div></div><div class="card"><div class="metric-label">Tài sản chung</div><div class="value">${money(shared)}</div></div><div class="card"><div class="metric-label">Thu tháng</div><div class="value positive">${money(m.income)}</div></div><div class="card"><div class="metric-label">Chi tháng</div><div class="value negative">${money(m.expense)}</div></div><div class="card"><div class="metric-label">Phải thu</div><div class="value">${money(f.receivable)}</div></div><div class="card"><div class="metric-label">Phải trả</div><div class="value">${money(f.payable)}</div></div></div><h3 class="section-title">Số dư tài khoản</h3><div class="grid">${db.accounts.map(a=>`<div class="card"><b>${esc(a.name)}</b><div class="value">${money(f.account[a.id])}</div><small>${a.liquid!==false?'Có thể chi ngay':'Không tính tiền có thể chi ngay'}</small></div>`).join('')}</div><h3>Giao dịch gần đây</h3>${txTable([...db.tx].reverse().slice(0,10))}`}
+function transactionForm(){return `<h2>➕ Ghi Thu / Chi</h2><div class="card no-print"><form onsubmit="addTxV2(event)"><div class="grid"><div><label>Loại</label><select id="type"><option value="expense">Chi</option><option value="income">Thu</option></select></div><div><label>Ngày</label><input id="date" type="date" required value="${today()}"></div><div><label>Số tiền (VND)</label><input id="amount" type="number" min="1" step="1" required inputmode="numeric"></div><div><label>Quỹ</label><select id="fund">${opts(db.funds)}</select></div><div><label>Tài khoản tiền</label><select id="account">${opts(db.accounts)}</select></div><div><label>Hình thức</label><select id="method"><option value="CK">Chuyển khoản</option><option value="TM">Tiền mặt</option><option value="">Khác / không ghi</option></select></div><div><label>Mã chung</label><input id="commonCode" maxlength="20" placeholder="VD: CN, CLB, QL, QT"></div><div><label>Mã cá nhân</label><input id="personalCode" maxlength="30" placeholder="VD: A1, N, L..."></div></div><label>Nội dung</label><input id="category" list="categorySuggestions" maxlength="120" placeholder="Lương, học phí, ăn uống..."><datalist id="categorySuggestions">${suggestions()}</datalist><label>Ghi chú</label><textarea id="note" maxlength="500" rows="2"></textarea><p><button>Lưu giao dịch</button></p></form></div><h3>Lịch sử gần đây</h3>${txTable([...db.tx].reverse().slice(0,30),true)}`}
+function transferView(){return `<h2>⇄ Chuyển tiền / Cân đối tài sản</h2><div class="notice">Chuyển tiền nội bộ chỉ đổi nơi giữ tiền, không tính là Thu hoặc Chi.</div><div class="card"><form onsubmit="addTransferV2(event)"><div class="grid"><div><label>Ngày</label><input id="trDate" type="date" value="${today()}" required></div><div><label>Số tiền</label><input id="trAmount" type="number" min="1" step="1" required></div><div><label>Quỹ</label><select id="trFund">${opts(db.funds)}</select></div><div><label>Từ tài khoản</label><select id="trFrom">${opts(db.accounts)}</select></div><div><label>Đến tài khoản</label><select id="trTo">${opts(db.accounts)}</select></div></div><label>Nội dung</label><input id="trContent" placeholder="VD: Rút ATM, chuyển MB 999 → Tiền mặt"><p><button>Lưu chuyển tiền</button></p></form></div>`}
+function accountsViewV203(f){return `<h2>💳 Tài khoản tiền</h2><div class="grid">${db.accounts.map(a=>`<div class="card"><b>${esc(a.name)}</b><div class="value">${money(f.account[a.id])}</div><small>Số dư đầu kỳ: ${money(a.openingBalance)}</small><br><small>${a.liquid!==false?'Có thể chi ngay':'Không tính vào tiền có thể chi ngay'}</small><p class="no-print"><button class="alt" onclick="editOpeningBalance('${a.id}')">Sửa số dư đầu kỳ</button></p></div>`).join('')}</div><div class="notice">Số dư đầu kỳ chỉ dùng làm mốc bắt đầu quản lý. Thu/Chi, chuyển tiền, công nợ và đầu tư sau đó sẽ tự làm thay đổi số dư hiện tại.</div>`}
+function debtRemaining(x){return Math.max(0,Number(x.principal||0)-Number(x.paid||0))}
+function debtsView(){const f=SoQuyFinanceV2.calc(db);return `<h2>📒 Công nợ</h2><div class="dashboard-grid"><div class="card"><div class="metric-label">Phải thu</div><div class="value positive">${money(f.receivable)}</div></div><div class="card"><div class="metric-label">Phải trả</div><div class="value negative">${money(f.payable)}</div></div></div><div class="card no-print"><h3>Thêm khoản công nợ</h3><form onsubmit="addDebtV2(event)"><div class="grid"><div><label>Loại</label><select id="debtDirection"><option value="receivable">Cho mượn / Phải thu</option><option value="payable">Đi vay / Phải trả</option></select></div><div><label>Ngày</label><input id="debtDate" type="date" value="${today()}" required></div><div><label>Số tiền</label><input id="debtPrincipal" type="number" min="1" step="1" required></div><div><label>Người / đơn vị</label><input id="debtPartner" placeholder="Tên người hoặc đơn vị"></div><div><label>Quỹ</label><select id="debtFund">${opts(db.funds)}</select></div><div><label>Tài khoản tiền</label><select id="debtAccount">${opts(db.accounts)}</select></div></div><label>Nội dung</label><input id="debtNote" placeholder="Lý do cho mượn / đi vay"><p><button>Lưu và ghi biến động tiền</button></p></form></div><div class="card scroll"><table><thead><tr><th>Ngày</th><th>Loại</th><th>Đối tượng</th><th>Ban đầu</th><th>Đã thu/trả</th><th>Còn lại</th><th class="no-print">Thao tác</th></tr></thead><tbody>${db.debts.map(x=>`<tr><td>${esc(x.date||'')}</td><td>${x.direction==='receivable'?'Phải thu':'Phải trả'}</td><td>${esc(x.partnerName||'')}<br><small>${esc(x.note||'')}</small></td><td>${money(x.principal)}</td><td>${money(x.paid)}</td><td>${money(debtRemaining(x))}</td><td class="no-print">${debtRemaining(x)>0?`<button class="alt" onclick="settleDebtV203('${x.id}')">${x.direction==='receivable'?'Thu hồi':'Trả nợ'}</button>`:'Đã tất toán'}</td></tr>`).join('')||'<tr><td colspan="7">Chưa có công nợ</td></tr>'}</tbody></table></div>`}
+function investmentBookValue(x){return Math.max(0,Number(x.cost||0)+Number(x.addedCost||0)-Number(x.redeemed||0))}
+function investmentsView(){const f=SoQuyFinanceV2.calc(db);return `<h2>📈 Đầu tư / Tài sản</h2><div class="hero"><div class="muted">Giá trị đầu tư đang theo dõi</div><div class="value">${money(f.investmentValue)}</div></div><div class="card no-print"><h3>Thêm tài sản đầu tư</h3><form onsubmit="addInvestmentV2(event)"><div class="grid"><div><label>Loại tài sản</label><select id="invKind"><option>Vàng</option><option>Cổ phiếu</option><option>Tiết kiệm</option><option>Võ phục</option><option>Công nghệ</option><option>Khác</option></select></div><div><label>Tên</label><input id="invName" required placeholder="VD: MBS, Vàng, AI"></div><div><label>Vốn ban đầu</label><input id="invCost" type="number" min="0" step="1"></div><div><label>Giá trị hiện tại</label><input id="invValue" type="number" min="0" step="1"></div><div><label>Quỹ</label><select id="invFund">${opts(db.funds)}</select></div><div><label>Tài khoản chi</label><select id="invAccount">${opts(db.accounts)}</select></div></div><label>Ghi chú</label><input id="invNote"><p><button>Lưu và ghi tiền đầu tư</button></p></form></div><div class="card scroll"><table><thead><tr><th>Loại</th><th>Tài sản</th><th>Vốn sổ sách</th><th>Giá trị hiện tại</th><th class="no-print">Thao tác</th></tr></thead><tbody>${db.investments.map(x=>`<tr><td>${esc(x.kind||'')}</td><td>${esc(x.name||'')}</td><td>${money(investmentBookValue(x))}</td><td>${money(x.currentValue??investmentBookValue(x))}</td><td class="no-print"><button class="alt" onclick="addInvestmentCapitalV203('${x.id}')">Mua thêm</button> <button class="alt" onclick="redeemInvestmentV203('${x.id}')">Thu hồi</button> <button class="alt" onclick="revalueInvestmentV203('${x.id}')">Cập nhật giá trị</button></td></tr>`).join('')||'<tr><td colspan="5">Chưa có tài sản đầu tư</td></tr>'}</tbody></table></div>`}
+render=function(){document.querySelectorAll('main>section').forEach(s=>s.classList.toggle('hidden',s.id!==tab));document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));const f=SoQuyFinanceV2.calc(db);document.getElementById('overview').innerHTML=dashboard();document.getElementById('funds').innerHTML=`<h2>💰 Các quỹ</h2><div class="grid">${db.funds.map(x=>`<div class="card"><b>${esc(x.name)}</b><div class="value">${money(f.fund[x.id])}</div><small>${x.scope==='shared'?'Tài sản chung':'Tài sản cá nhân'}</small></div>`).join('')}</div>`;document.getElementById('accounts').innerHTML=accountsViewV203(f);document.getElementById('transactions').innerHTML=transactionForm();document.getElementById('transfer').innerHTML=transferView();document.getElementById('debts').innerHTML=debtsView();document.getElementById('investments').innerHTML=investmentsView();document.getElementById('reports').innerHTML=`<h2>📊 Báo cáo</h2><div class="card no-print" id="reportFilters"><label>Quỹ</label><select id="reportFund" onchange="drawReport()"><option value="">Tất cả quỹ</option>${opts(db.funds)}</select><div class="grid"><div><label>Từ ngày</label><input type="date" id="from" onchange="drawReport()"></div><div><label>Đến ngày</label><input type="date" id="to" onchange="drawReport()"></div></div><label>Kiểu báo cáo</label><select id="reportMode" onchange="reportMode=this.value;drawReport()"><option value="detail">Chi tiết giao dịch</option><option value="group">Tổng hợp theo nội dung</option></select></div><div id="reportResult"></div>`;document.getElementById('backup').innerHTML=`<h2>Sao lưu dữ liệu</h2><div class="card"><button onclick="backup()">Tải bản sao lưu JSON</button></div>`;document.getElementById('cloud').innerHTML=cloudView();if(tab==='reports')drawReport()}
+function addTxV2(e){e.preventDefault();let v=Number(amount.value);if(!Number.isSafeInteger(v)||v<=0)return alert('Số tiền phải là số nguyên dương');db.tx.push({id:id(),type:type.value,date:date.value,amount:v,fund:fund.value,account:account.value,commonCode:commonCode.value.trim(),personalCode:personalCode.value.trim(),method:method.value,content:category.value.trim(),category:category.value.trim(),note:note.value.trim()});save();alert('Đã lưu '+typeLabel(type.value))}
+function addTransferV2(e){e.preventDefault();let v=Number(trAmount.value);if(!Number.isSafeInteger(v)||v<=0)return alert('Số tiền không hợp lệ');if(trFrom.value===trTo.value)return alert('Tài khoản chuyển và nhận phải khác nhau');db.tx.push({id:id(),type:'account_transfer',date:trDate.value,amount:v,fund:trFund.value,account:trFrom.value,toAccount:trTo.value,category:trContent.value.trim(),content:trContent.value.trim()});save();alert('Đã lưu chuyển tiền')}
+function addDebtV2(e){e.preventDefault();let v=Number(debtPrincipal.value);if(v<=0)return alert('Số tiền không hợp lệ');let d={id:id(),direction:debtDirection.value,date:debtDate.value,principal:v,paid:0,partnerName:debtPartner.value.trim(),note:debtNote.value.trim(),status:'open',fund:debtFund.value,account:debtAccount.value};db.debts.push(d);db.tx.push({id:id(),type:d.direction==='receivable'?'loan_out':'borrow_in',date:d.date,amount:v,fund:d.fund,account:d.account,category:d.direction==='receivable'?'Cho mượn':'Đi vay',content:d.note,note:d.partnerName,debtId:d.id});save();alert('Đã lưu công nợ và cập nhật số dư tiền')}
+function addInvestmentV2(e){e.preventDefault();let c=Number(invCost.value||0),v=Number(invValue.value||c),x={id:id(),kind:invKind.value,name:invName.value.trim(),cost:c,addedCost:0,redeemed:0,currentValue:v,note:invNote.value.trim(),status:'open',fund:invFund.value,account:invAccount.value};db.investments.push(x);if(c>0)db.tx.push({id:id(),type:'investment_buy',date:today(),amount:c,fund:x.fund,account:x.account,category:'Đầu tư',content:x.name,investmentId:x.id});save();alert('Đã lưu tài sản và cập nhật số dư tiền')}
+quickAdd=function(kind){tab='transactions';render();document.getElementById('type').value=kind;document.getElementById('amount').focus();window.scrollTo({top:0,behavior:'smooth'})}
+
+
+function editOpeningBalance(aid){let a=db.accounts.find(x=>x.id===aid);if(!a)return;let v=prompt('Số dư đầu kỳ của '+a.name+' (VND):',String(Number(a.openingBalance||0)));if(v===null)return;v=Number(String(v).replace(/[^0-9.-]/g,''));if(!Number.isFinite(v))return alert('Số tiền không hợp lệ');a.openingBalance=v;save()}
+function settleDebtV203(did){let d=db.debts.find(x=>x.id===did);if(!d)return;let remain=debtRemaining(d);if(remain<=0)return;let raw=prompt((d.direction==='receivable'?'Số tiền thu hồi':'Số tiền trả nợ')+' (tối đa '+money(remain)+'):',String(remain));if(raw===null)return;let v=Number(String(raw).replace(/[^0-9.-]/g,''));if(!(v>0)||v>remain)return alert('Số tiền không hợp lệ');let aid=prompt('Nhập ID tài khoản tiền nhận/chi:\n'+db.accounts.map(a=>a.id+' = '+a.name).join('\n'),d.account||db.accounts[0]?.id||'');if(!db.accounts.some(a=>a.id===aid))return alert('Tài khoản không hợp lệ');let fid=d.fund||db.funds[0]?.id;if(!db.funds.some(f=>f.id===fid))fid=db.funds[0]?.id;d.paid=Number(d.paid||0)+v;d.status=debtRemaining(d)<=0?'closed':'open';db.tx.push({id:id(),type:d.direction==='receivable'?'loan_repayment_in':'debt_repayment_out',date:today(),amount:v,fund:fid,account:aid,category:d.direction==='receivable'?'Thu hồi cho mượn':'Trả nợ',content:d.note||'',note:d.partnerName||'',debtId:d.id});save()}
+function addInvestmentCapitalV203(iid){let x=db.investments.find(v=>v.id===iid);if(!x)return;let raw=prompt('Số tiền mua thêm / đầu tư thêm:', '0');if(raw===null)return;let v=Number(String(raw).replace(/[^0-9.-]/g,''));if(!(v>0))return alert('Số tiền không hợp lệ');x.addedCost=Number(x.addedCost||0)+v;x.currentValue=Number(x.currentValue??investmentBookValue(x))+v;db.tx.push({id:id(),type:'investment_buy',date:today(),amount:v,fund:x.fund||db.funds[0]?.id,account:x.account||db.accounts[0]?.id,category:'Đầu tư thêm',content:x.name,investmentId:x.id});save()}
+function redeemInvestmentV203(iid){let x=db.investments.find(v=>v.id===iid);if(!x)return;let raw=prompt('Số tiền thực nhận khi thu hồi:', '0');if(raw===null)return;let v=Number(String(raw).replace(/[^0-9.-]/g,''));if(!(v>0))return alert('Số tiền không hợp lệ');x.redeemed=Number(x.redeemed||0)+v;x.currentValue=Math.max(0,Number(x.currentValue??investmentBookValue(x))-v);if(x.currentValue===0)x.status='closed';db.tx.push({id:id(),type:'investment_redeem',date:today(),amount:v,fund:x.fund||db.funds[0]?.id,account:x.account||db.accounts[0]?.id,category:'Thu hồi đầu tư',content:x.name,investmentId:x.id});save()}
+function revalueInvestmentV203(iid){let x=db.investments.find(v=>v.id===iid);if(!x)return;let raw=prompt('Giá trị hiện tại của '+x.name+':',String(Number(x.currentValue??investmentBookValue(x))));if(raw===null)return;let v=Number(String(raw).replace(/[^0-9.-]/g,''));if(v<0||!Number.isFinite(v))return alert('Giá trị không hợp lệ');x.currentValue=v;if(v>0)x.status='open';save()}
+
+// ===== Sổ Quỹ 2.0.6: Mobile Home & Fund Detail =====
+let selectedFundId='';
+const extraStyle=document.createElement('style');
+extraStyle.textContent=`
+#tabs{display:none!important}.notice{font-size:13px}.home-section-title{margin:22px 2px 10px;font-size:20px}.home-list{display:grid;gap:10px}.home-row{width:100%;background:#fff;color:#18332b;border:1px solid #dce7e0;border-radius:15px;padding:16px;text-align:left;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 8px #173d2910}.home-row strong{font-size:17px}.home-row .amount{font-size:18px;font-weight:800}.home-account{cursor:default}.home-transfer{width:100%;margin:12px 0;padding:15px;font-weight:750}.more-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.more-grid button{background:#e3ede8;color:#174936}.fund-head{background:#155e4a;color:#fff;border-radius:16px;padding:18px;margin:8px 0 14px}.fund-head .value{font-size:30px}.fund-head small{color:#d8eee4}.fund-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.fund-actions button{padding:15px;font-weight:800}.fund-actions .expense{background:#b93d3d}.back-home{background:#e3ede8;color:#174936;margin-bottom:8px}.fund-tx{display:flex;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid #e8eeea}.fund-tx:last-child{border:0}.fund-tx small{display:block;margin-top:4px}.fund-month{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}.fund-month>div{background:#fff;border:1px solid #dce7e0;border-radius:14px;padding:14px}.fund-month b{display:block;font-size:19px;margin-top:5px}@media(max-width:600px){main{padding:10px}.notice{margin-top:4px}.home-row{padding:15px 14px}.home-section-title{font-size:19px}}
+`;
+document.head.appendChild(extraStyle);
+
+function home206(){
+ const f=SoQuyFinanceV2.calc(db);
+ return `<h2>💼 Sổ Quỹ</h2>
+ <h3 class="home-section-title">💰 Các loại quỹ</h3>
+ <div class="home-list">${db.funds.map(x=>`<button class="home-row" onclick="openFund206('${x.id}')"><span><strong>${esc(x.name)}</strong><br><small>${x.scope==='shared'?'Quỹ / tài sản chung':'Quỹ cá nhân'}</small></span><span class="amount">${money(f.fund[x.id])} ›</span></button>`).join('')}</div>
+ <h3 class="home-section-title">💳 Các loại tài khoản</h3>
+ <div class="home-list">${db.accounts.map(a=>`<div class="home-row home-account"><span onclick="openAccount208('${a.id}')" style="flex:1;cursor:pointer"><strong>${esc(a.name)}</strong><br><small>${a.liquid!==false?'Có thể chi ngay':'Không tính tiền có thể chi ngay'}</small></span><span class="amount" onclick="openAccount208('${a.id}')" style="cursor:pointer">${money(f.account[a.id])} ›</span></div>`).join('')}</div>
+ <button class="home-transfer" onclick="switchTab('transfer')">⇄ Chuyển tiền giữa các tài khoản</button>
+ <h3 class="home-section-title">☰ Thêm</h3><div class="more-grid no-print"><button onclick="switchTab('debts')">📒 Công nợ</button><button onclick="switchTab('investments')">📈 Đầu tư</button><button onclick="switchTab('reports')">📊 Báo cáo</button><button onclick="switchTab('backup')">💾 Sao lưu</button><button onclick="switchTab('cloud')">☁️ Đồng bộ</button><button onclick="switchTab('accounts')">⚙️ Tài khoản</button></div>`;
+}
+function openFund206(fid){selectedFundId=fid;homeFund=fid;tab='funds';render();window.scrollTo({top:0,behavior:'smooth'})}
+function fundDetail206(fid){
+ const f=SoQuyFinanceV2.calc(db),fund=db.funds.find(x=>x.id===fid); if(!fund)return home206();
+ const arr=db.tx.filter(t=>t.fund===fid||t.toFund===fid).slice().reverse();
+ const month=arr.filter(t=>t.date?.startsWith(homeMonth));
+ const inc=month.filter(t=>t.type==='income').reduce((s,t)=>s+Number(t.amount||0),0);
+ const exp=month.filter(t=>t.type==='expense').reduce((s,t)=>s+Number(t.amount||0),0);
+ return `<button class="back-home" onclick="goHome206()">← Trang chủ</button><div class="fund-head"><small>Quỹ đang xem</small><h2>${esc(fund.name)}</h2><div class="value">${money(f.fund[fid])}</div></div>
+ <div class="fund-actions no-print"><button onclick="quickAddFund206('income','${fid}')">＋ THU</button><button class="expense" onclick="quickAddFund206('expense','${fid}')">− CHI</button></div>
+ <div class="fund-month"><div><small>Thu tháng</small><b class="positive">${money(inc)}</b></div><div><small>Chi tháng</small><b class="negative">${money(exp)}</b></div></div>
+ <h3>Giao dịch gần đây <small style="font-weight:normal">· nhấn để chỉnh sửa</small></h3><div class="card">${arr.slice(0,15).map(t=>`<button type="button" class="fund-tx fund-tx-edit2081" onclick="openTx208('${t.id}')"><div><strong>${esc(t.category||t.content||typeLabel(t.type))}</strong><small>${esc(t.date||'')} · ${esc(name(db.accounts,t.account))}</small></div><b class="${t.type==='income'?'positive':t.type==='expense'?'negative':''}">${t.type==='income'?'+':t.type==='expense'?'−':''}${money(t.amount)} ›</b></button>`).join('')||'<p class="muted">Chưa có giao dịch của quỹ này.</p>'}</div>`;
+}
+function goHome206(){selectedFundId='';homeFund='';tab='overview';render();window.scrollTo({top:0,behavior:'smooth'})}
+function quickAddFund206(kind,fid){selectedFundId=fid;homeFund=fid;tab='transactions';render();document.getElementById('type').value=kind;document.getElementById('fund').value=fid;document.getElementById('amount').focus();window.scrollTo({top:0,behavior:'smooth'})}
+const render205=render;
+render=function(){
+ document.querySelectorAll('main>section').forEach(s=>s.classList.toggle('hidden',s.id!==tab));
+ const f=SoQuyFinanceV2.calc(db);
+ document.getElementById('overview').innerHTML=home206();
+ document.getElementById('funds').innerHTML=selectedFundId?fundDetail206(selectedFundId):home206();
+ document.getElementById('accounts').innerHTML=`<button class="back-home" onclick="goHome206()">← Trang chủ</button>`+accountsViewV203(f);
+ document.getElementById('transactions').innerHTML=`<button class="back-home" onclick="${selectedFundId?`openFund206('${selectedFundId}')`:'goHome206()'}">← Quay lại</button>`+transactionForm();
+ document.getElementById('transfer').innerHTML=`<button class="back-home" onclick="goHome206()">← Trang chủ</button>`+transferView();
+ document.getElementById('debts').innerHTML=`<button class="back-home" onclick="goHome206()">← Trang chủ</button>`+debtsView();
+ document.getElementById('investments').innerHTML=`<button class="back-home" onclick="goHome206()">← Trang chủ</button>`+investmentsView();
+ document.getElementById('reports').innerHTML=`<button class="back-home" onclick="goHome206()">← Trang chủ</button><h2>📊 Báo cáo</h2><div class="card no-print" id="reportFilters"><label>Quỹ</label><select id="reportFund" onchange="drawReport()"><option value="">Tất cả quỹ</option>${opts(db.funds)}</select><div class="grid"><div><label>Từ ngày</label><input type="date" id="from" onchange="drawReport()"></div><div><label>Đến ngày</label><input type="date" id="to" onchange="drawReport()"></div></div><label>Kiểu báo cáo</label><select id="reportMode" onchange="reportMode=this.value;drawReport()"><option value="detail">Chi tiết giao dịch</option><option value="group">Tổng hợp theo nội dung</option></select></div><div id="reportResult"></div>`;
+ document.getElementById('backup').innerHTML=`<button class="back-home" onclick="goHome206()">← Trang chủ</button><h2>💾 Sao lưu dữ liệu</h2><div class="card"><button onclick="backup()">Tải bản sao lưu JSON</button></div>`;
+ document.getElementById('cloud').innerHTML=`<button class="back-home" onclick="goHome206()">← Trang chủ</button>`+cloudView();
+ if(tab==='reports')drawReport();
+ if(tab==='transactions'){
+   if(selectedFundId&&document.getElementById('fund'))document.getElementById('fund').value=selectedFundId;
+ }
+}
+quickAdd=function(kind){tab='transactions';render();document.getElementById('type').value=kind;if(selectedFundId)document.getElementById('fund').value=selectedFundId;document.getElementById('amount').focus();window.scrollTo({top:0,behavior:'smooth'})}
+
+
+// ===== Sổ Quỹ 2.0.8: Mobile UX, CRUD cơ bản & Android Back =====
+const style207=document.createElement('style');
+style207.textContent=`
+body{padding-bottom:calc(92px + env(safe-area-inset-bottom,0px))}
+main{padding-bottom:calc(70px + env(safe-area-inset-bottom,0px))}
+.section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:22px 2px 10px}.section-head .home-section-title{margin:0}.mini-add{padding:8px 12px;border-radius:10px;font-weight:750}.row-actions{display:flex;align-items:center;gap:9px}.icon-delete{background:#f7e7e7!important;color:#a12f2f!important;padding:8px 10px!important;min-width:42px}.add-panel{margin:10px 0 16px}.add-panel .toolbar{margin-top:10px}.tx-title{margin:4px 0 14px}.tx-fund-badge{display:inline-block;background:#e3ede8;color:#174936;padding:7px 11px;border-radius:999px;font-weight:750;margin-bottom:8px}.tx-primary label{font-size:17px}.tx-primary input{font-size:18px;padding:14px}.tx-secondary{margin-top:8px}
+@media(max-width:600px){body{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))}main{padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}.icon-delete{padding:8px!important}}
+`;
+document.head.appendChild(style207);
+let addFundOpen207=false,addAccountOpen207=false;
+function toggleAddFund207(){addFundOpen207=!addFundOpen207;render();setTimeout(()=>document.getElementById('fundName207')?.focus(),50)}
+function toggleAddAccount207(){addAccountOpen207=!addAccountOpen207;render();setTimeout(()=>document.getElementById('accountName207')?.focus(),50)}
+function addFund207(e){e.preventDefault();const el=document.getElementById('fundName207'),n=el.value.trim();if(!n)return;if(db.funds.some(f=>f.name.toLowerCase()===n.toLowerCase()))return alert('Quỹ đã tồn tại');db.funds.push({id:id(),name:n,scope:'personal'});addFundOpen207=false;save()}
+function addAccount207(e){e.preventDefault();const el=document.getElementById('accountName207'),n=el.value.trim();if(!n)return;if(db.accounts.some(a=>a.name.toLowerCase()===n.toLowerCase()))return alert('Tài khoản đã tồn tại');db.accounts.push({id:id(),name:n,kind:'bank',openingBalance:0,liquid:true});addAccountOpen207=false;save()}
+function deleteFund207(fid){const f=db.funds.find(x=>x.id===fid);if(!f)return;const used=db.tx.some(t=>t.fund===fid||t.toFund===fid)||db.debts.some(x=>x.fund===fid)||db.investments.some(x=>x.fund===fid);if(used)return alert('Quỹ này đã có dữ liệu phát sinh nên chưa thể xóa. Hãy giữ quỹ để bảo toàn lịch sử giao dịch.');if(db.funds.length<=1)return alert('Cần giữ lại ít nhất 1 quỹ.');if(confirm(`Xóa quỹ “${f.name}”?`)){db.funds=db.funds.filter(x=>x.id!==fid);if(selectedFundId===fid)selectedFundId='';save()}}
+function deleteAccount207(aid){const a=db.accounts.find(x=>x.id===aid);if(!a)return;const used=db.tx.some(t=>t.account===aid||t.toAccount===aid)||db.debts.some(x=>x.account===aid)||db.investments.some(x=>x.account===aid);if(used)return alert('Tài khoản này đã có dữ liệu phát sinh nên chưa thể xóa. Hãy giữ tài khoản để bảo toàn lịch sử giao dịch.');if(db.accounts.length<=1)return alert('Cần giữ lại ít nhất 1 tài khoản tiền.');if(confirm(`Xóa tài khoản “${a.name}”?`)){db.accounts=db.accounts.filter(x=>x.id!==aid);save()}}
+function home207(){
+ const f=SoQuyFinanceV2.calc(db);
+ const fundAdd=addFundOpen207?`<div class="card add-panel no-print"><form onsubmit="addFund207(event)"><label>Tên quỹ mới</label><input id="fundName207" maxlength="70" required placeholder="VD: Quỹ Du lịch"><div class="toolbar"><button>Thêm quỹ</button><button type="button" class="alt" onclick="toggleAddFund207()">Hủy</button></div></form></div>`:'';
+ const accountAdd=addAccountOpen207?`<div class="card add-panel no-print"><form onsubmit="addAccount207(event)"><label>Tên tài khoản mới</label><input id="accountName207" maxlength="70" required placeholder="VD: MB 999, Vietcombank"><div class="toolbar"><button>Thêm tài khoản</button><button type="button" class="alt" onclick="toggleAddAccount207()">Hủy</button></div></form></div>`:'';
+ return `<h2>💼 Sổ Quỹ</h2>
+ <div class="section-head"><h3 class="home-section-title">💰 Các loại quỹ</h3><button class="mini-add" onclick="toggleAddFund207()">＋ Thêm</button></div>${fundAdd}
+ <div class="home-list">${db.funds.map(x=>`<div class="home-row"><span onclick="openFund206('${x.id}')" style="flex:1;cursor:pointer"><strong>${esc(x.name)}</strong><br><small>${x.scope==='shared'?'Quỹ / tài sản chung':'Quỹ cá nhân'}</small></span><span class="row-actions"><span class="amount" onclick="openFund206('${x.id}')" style="cursor:pointer">${money(f.fund[x.id])} ›</span><button class="icon-delete no-print" onclick="deleteFund207('${x.id}')" aria-label="Xóa quỹ">🗑</button></span></div>`).join('')}</div>
+ <div class="section-head"><h3 class="home-section-title">💳 Các loại tài khoản</h3><button class="mini-add" onclick="toggleAddAccount207()">＋ Thêm</button></div>${accountAdd}
+ <div class="home-list">${db.accounts.map(a=>`<div class="home-row home-account"><span onclick="openAccount208('${a.id}')" style="flex:1;cursor:pointer"><strong>${esc(a.name)}</strong><br><small>${a.liquid!==false?'Có thể chi ngay':'Không tính tiền có thể chi ngay'}</small></span><span class="row-actions"><span class="amount" onclick="openAccount208('${a.id}')" style="cursor:pointer">${money(f.account[a.id])} ›</span><button class="icon-delete no-print" onclick="deleteAccount207('${a.id}')" aria-label="Xóa tài khoản">🗑</button></span></div>`).join('')}</div>
+ <button class="home-transfer" onclick="switchTab('transfer')">⇄ Chuyển tiền giữa các tài khoản</button>
+ <h3 class="home-section-title">☰ Thêm</h3><div class="more-grid no-print"><button onclick="switchTab('debts')">📒 Công nợ</button><button onclick="switchTab('investments')">📈 Đầu tư</button><button onclick="switchTab('reports')">📊 Báo cáo</button><button onclick="switchTab('backup')">💾 Sao lưu</button><button onclick="switchTab('cloud')">☁️ Đồng bộ</button><button onclick="switchTab('accounts')">⚙️ Tài khoản</button></div>`;
+}
+function transactionForm207(){
+ const fundObj=db.funds.find(x=>x.id===selectedFundId); const fixed=!!fundObj;
+ const kind=quickType==='income'?'income':'expense';
+ return `<div class="tx-title"><h2>${kind==='income'?'＋ Ghi Thu':'− Ghi Chi'}${fixed?' – '+esc(fundObj.name):''}</h2>${fixed?`<span class="tx-fund-badge">Quỹ: ${esc(fundObj.name)}</span>`:''}</div><div class="card no-print"><form onsubmit="addTx207(event)"><input id="type" type="hidden" value="${kind}">${fixed?`<input id="fund" type="hidden" value="${esc(fundObj.id)}">`:`<label>Quỹ</label><select id="fund">${opts(db.funds)}</select>`}<div class="tx-primary"><label>Số tiền (VND)</label><input id="amount" type="number" min="1" step="1" required inputmode="numeric" autofocus><label>Nội dung</label><input id="category" list="categorySuggestions" maxlength="120" required placeholder="VD: Lương, học phí, ăn uống..."><datalist id="categorySuggestions">${suggestions()}</datalist></div><div class="tx-secondary"><label>Ngày</label><input id="date" type="date" required value="${today()}"><label>Tài khoản tiền</label><select id="account">${opts(db.accounts)}</select><label>Ghi chú</label><textarea id="note" maxlength="500" rows="2"></textarea></div><p><button>Lưu giao dịch</button></p></form></div><h3>Lịch sử gần đây</h3>${txTable([...db.tx].reverse().filter(t=>!fixed||t.fund===fundObj.id).slice(0,30),true)}`;
+}
+function inferredMethod207(aid){const a=db.accounts.find(x=>x.id===aid);return a?.kind==='cash'?'TM':'CK'}
+function addTx207(e){e.preventDefault();const v=Number(document.getElementById('amount').value),kind=document.getElementById('type').value,fid=document.getElementById('fund').value,aid=document.getElementById('account').value;if(!Number.isSafeInteger(v)||v<=0)return alert('Số tiền phải là số nguyên dương');db.tx.push({id:id(),type:kind,date:document.getElementById('date').value,amount:v,fund:fid,account:aid,method:inferredMethod207(aid),content:document.getElementById('category').value.trim(),category:document.getElementById('category').value.trim(),note:document.getElementById('note').value.trim()});save();alert('Đã lưu '+(kind==='income'?'Thu':'Chi'));selectedFundId=fid;tab='funds';render();window.scrollTo({top:0,behavior:'smooth'})}
+function quickAddFund206(kind,fid){selectedFundId=fid;homeFund=fid;quickType=kind;tab='transactions';render();setTimeout(()=>{syncMethod207();document.getElementById('amount')?.focus()},20);window.scrollTo({top:0,behavior:'smooth'})}
+function soquyHandleBack(){if(tab==='transactions'&&selectedFundId){tab='funds';render();window.scrollTo(0,0);return true}if(tab!=='overview'||selectedFundId){goHome206();return true}return false}
+window.soquyHandleBack=soquyHandleBack;
+const render206=render;
+render=function(){render206();document.getElementById('overview').innerHTML=home207();if(tab==='transactions'){document.getElementById('transactions').innerHTML=`<button class="back-home" onclick="${selectedFundId?`openFund206('${selectedFundId}')`:'goHome206()'}">← Quay lại</button>`+transactionForm207();setTimeout(syncMethod207,0)}};
+
+// 2.0.8: Account ledger + transaction detail/edit, preserving transaction IDs.
+let selectedAccount208='',editingTx208='';
+function openAccount208(aid){selectedAccount208=aid;editingTx208='';tab='overview';render();window.scrollTo(0,0)}
+function closeAccount208(){selectedAccount208='';editingTx208='';goHome206()}
+function openTx208(txid){editingTx208=txid;render();window.scrollTo(0,0)}
+function txCard208(t){const label={income:'Thu',expense:'Chi',fund_transfer:'Chuyển quỹ',account_transfer:'Chuyển tài khoản'}[t.type]||t.type;return `<button class="ledger-item208" onclick="openTx208('${t.id}')"><span><b>${esc(t.content||t.category||label)}</b><small>${esc(t.date)} · ${esc(name(db.funds,t.fund))} · ${esc(label)}</small></span><strong>${t.type==='income'?'+':t.type==='expense'?'−':''}${money(t.amount)} ›</strong></button>`}
+function accountView208(){const a=db.accounts.find(x=>x.id===selectedAccount208);if(!a){selectedAccount208='';return home207()}const calc=SoQuyFinanceV2.calc(db),arr=db.tx.filter(t=>t.account===a.id||t.toAccount===a.id).slice().sort((x,y)=>String(y.date).localeCompare(String(x.date)));return `<button class="back-home" onclick="closeAccount208()">← Trang chủ</button><h2>💳 ${esc(a.name)}</h2><div class="card"><small>Số dư hiện tại</small><h2>${money(calc.account[a.id])}</h2><p>${arr.length} giao dịch liên quan</p></div><h3>Lịch sử giao dịch</h3><div class="ledger208">${arr.map(txCard208).join('')||'<div class="card">Chưa có giao dịch</div>'}</div>`}
+function txDetail208(){const t=db.tx.find(x=>x.id===editingTx208);if(!t){editingTx208='';return selectedAccount208?accountView208():home207()}return `<button class="back-home" onclick="editingTx208='';render()">← Quay lại</button><h2>Chỉnh sửa giao dịch</h2><div class="card"><form onsubmit="saveEdit208(event)"><label>Loại giao dịch</label><input disabled value="${esc(({income:'Thu',expense:'Chi',fund_transfer:'Chuyển quỹ',account_transfer:'Chuyển tài khoản'})[t.type]||t.type)}"><label>Số tiền (VND)</label><input id="editAmount208" type="number" min="1" step="1" required value="${Number(t.amount)}"><label>Nội dung</label><input id="editContent208" maxlength="100" value="${esc(t.content||t.category||'')}"><label>Ngày</label><input id="editDate208" type="date" required value="${esc(t.date)}"><label>Quỹ</label><select id="editFund208">${db.funds.map(f=>`<option value="${esc(f.id)}" ${f.id===t.fund?'selected':''}>${esc(f.name)}</option>`).join('')}</select><label>Tài khoản</label><select id="editAccount208">${db.accounts.map(a=>`<option value="${esc(a.id)}" ${a.id===t.account?'selected':''}>${esc(a.name)}</option>`).join('')}</select>${t.toFund?`<label>Quỹ nhận</label><select id="editToFund208">${db.funds.map(f=>`<option value="${esc(f.id)}" ${f.id===t.toFund?'selected':''}>${esc(f.name)}</option>`).join('')}</select>`:''}${t.toAccount?`<label>Tài khoản nhận</label><select id="editToAccount208">${db.accounts.map(a=>`<option value="${esc(a.id)}" ${a.id===t.toAccount?'selected':''}>${esc(a.name)}</option>`).join('')}</select>`:''}<label>Ghi chú</label><textarea id="editNote208" maxlength="500" rows="2">${esc(t.note||'')}</textarea><p class="toolbar"><button type="submit">Lưu chỉnh sửa</button><button type="button" class="danger" onclick="deleteEdit208()">Xóa giao dịch</button></p></form></div>`}
+function saveEdit208(e){e.preventDefault();const t=db.tx.find(x=>x.id===editingTx208);if(!t)return;const amount=Number(document.getElementById('editAmount208').value);if(!Number.isSafeInteger(amount)||amount<=0)return alert('Số tiền phải là số nguyên dương');const fund=document.getElementById('editFund208').value,account=document.getElementById('editAccount208').value,toFund=document.getElementById('editToFund208')?.value,toAccount=document.getElementById('editToAccount208')?.value;if(t.type==='fund_transfer'&&fund===toFund)return alert('Quỹ chuyển và quỹ nhận phải khác nhau');if(t.type==='account_transfer'&&account===toAccount)return alert('Tài khoản chuyển và nhận phải khác nhau');t.amount=amount;t.date=document.getElementById('editDate208').value;t.fund=fund;t.account=account;t.method=inferredMethod207(account);if(toFund)t.toFund=toFund;if(toAccount)t.toAccount=toAccount;t.category=document.getElementById('editContent208').value.trim();t.content=t.category;t.note=document.getElementById('editNote208').value.trim();t.updatedAt=new Date().toISOString();editingTx208='';save()}
+function deleteEdit208(){if(!confirm('Xóa vĩnh viễn giao dịch này?'))return;db.tx=db.tx.filter(x=>x.id!==editingTx208);editingTx208='';save()}
+const render207=render;
+render=function(){render207();if(editingTx208){tab='overview';document.querySelectorAll('main>section').forEach(s=>s.classList.toggle('hidden',s.id!=='overview'));document.getElementById('overview').innerHTML=txDetail208()}else if(selectedAccount208){tab='overview';document.querySelectorAll('main>section').forEach(s=>s.classList.toggle('hidden',s.id!=='overview'));document.getElementById('overview').innerHTML=accountView208()}else if(tab==='transactions'){const list=db.tx.slice().reverse().slice(0,30);document.getElementById('transactions').insertAdjacentHTML('beforeend',`<h3>Giao dịch gần đây · nhấn để chỉnh sửa</h3><div class="ledger208">${list.map(txCard208).join('')}</div>`)}};
+const goHome208=goHome206;goHome206=function(){selectedAccount208='';editingTx208='';goHome208()};
+const back208=soquyHandleBack;soquyHandleBack=function(){if(editingTx208){editingTx208='';render();return true}if(selectedAccount208){closeAccount208();return true}return back208()};window.soquyHandleBack=soquyHandleBack;
+const style208=document.createElement('style');style208.textContent='.ledger208{display:grid;gap:8px}.ledger-item208{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;text-align:left;background:var(--card,#fff);color:inherit;border:1px solid #d9e0e8;border-radius:12px;padding:13px;cursor:pointer}.ledger-item208 span{display:grid;gap:5px;min-width:0}.ledger-item208 small{font-weight:400;opacity:.72}.ledger-item208 strong{white-space:nowrap;font-size:13px}';document.head.appendChild(style208);
+const style2081=document.createElement('style');style2081.textContent='.fund-tx-edit2081{display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;text-align:left;color:inherit;background:transparent;border:0;border-bottom:1px solid #e6e9ee;border-radius:0;padding:12px 2px;cursor:pointer;font:inherit}.fund-tx-edit2081:last-child{border-bottom:0}.fund-tx-edit2081 div{min-width:0}.fund-tx-edit2081 small{display:block;opacity:.7;margin-top:4px}.fund-tx-edit2081 b{white-space:nowrap}';document.head.appendChild(style2081);
+render();
+
+/* Auth preview: old sync disabled until account isolation is ready. */if('serviceWorker'in navigator&&!window.AndroidSync&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(()=>navigator.serviceWorker.ready).catch(err=>console.warn('Không cài được chế độ ngoại tuyến:',err));
+</script><style id="auth209-style">#auth209{position:fixed;inset:0;background:#f4f7f5;z-index:99999;overflow:auto;padding:22px 14px;display:flex;align-items:center;justify-content:center}#auth209 .authcard{background:white;border-radius:18px;padding:24px;width:min(440px,100%);box-shadow:0 8px 28px #102b211c}#auth209 button{width:100%;margin-top:12px}#auth209[hidden]{display:none!important}#auth209status{line-height:1.5;color:#155e4a}#account209{position:sticky;top:0;background:#e3ede8;padding:9px;z-index:50;display:none}#account209 button{margin-left:8px;padding:6px 10px}</style>
+<div id="account209"><span id="account209email"></span><button type="button" onclick="auth209Logout()">Đăng xuất</button><button type="button" onclick="sync209()">Đồng bộ ngay</button><button type="button" onclick="changePassword211()">Đổi mật khẩu</button><small id="sync209status"></small></div>
+<div id="auth209"><div class="authcard"><h2>🔐 Sổ Quỹ 2.1.2 Beta</h2><p>Đăng nhập để mở Sổ Quỹ riêng của bạn.</p><details class="auth209-config"><summary>⚙️ Cấu hình Supabase</summary><label>Project URL</label><input id="auth209url" type="url" placeholder="https://xxxx.supabase.co"><label>Publishable / anon key</label><input id="auth209key" type="password" placeholder="sb_publishable_... hoặc anon key"><button type="button" class="alt" onclick="auth209SaveConfig()">Lưu cấu hình</button></details><p id="auth209status" role="status" aria-live="polite">Nhập email và mật khẩu.</p><label>Email</label><input type="email" id="auth209email" autocomplete="email"><label>Mật khẩu</label><input type="password" id="auth209pass" autocomplete="current-password"><button type="button" onclick="auth209('login')">Đăng nhập</button><button type="button" class="alt" onclick="auth209('signup')">Đăng ký tài khoản</button><button type="button" class="alt" onclick="forgot211()">Quên mật khẩu?</button><button type="button" class="alt" onclick="configureRecovery212()">⚙️ Đường dẫn khôi phục mật khẩu</button><p class="muted">Tự đồng bộ khi ứng dụng đang mở và có Internet. Nếu hai thiết bị cùng sửa, hệ thống dừng ghi đè để bảo vệ dữ liệu. Chưa hỗ trợ tự hợp nhất xung đột.</p></div></div>
+<script>
+const AUTH209_URL='https://kenvtcipazykzshcnhjf.supabase.co';
+const AUTH209_CONFIG='soquy_cloud_config_v13';
+let current209=null, busy209=false,dirty209=false,revision209=0,session209=null;
+let autoSync209Timer=null, autoSync209Enabled=true;
+const SESSION211='soquy211_session';
+const RECOVERY_URL_KEY212='soquy212_recovery_url';
+function recoveryUrl212(){
+ if(!window.AndroidSync && location.protocol==='https:' && location.host!=='appassets.androidplatform.net')return new URL('reset-password.html',location.href).href;
+ return localStorage.getItem(RECOVERY_URL_KEY212)||'';
+}
+function configureRecovery212(){
+ const current=recoveryUrl212();
+ const entered=prompt('Dán URL trang khôi phục mật khẩu đã triển khai trên Netlify (https://.../reset-password.html):',current);
+ if(entered===null)return;
+ try{const u=new URL(entered.trim());if(u.protocol!=='https:'||u.username||u.password||!u.pathname.endsWith('/reset-password.html'))throw Error();localStorage.setItem(RECOVERY_URL_KEY212,u.href);alert('Đã lưu đường dẫn khôi phục mật khẩu.')}catch{alert('URL không hợp lệ. Phải là HTTPS và kết thúc bằng /reset-password.html.')}
+}
+const LOCAL_META209=(uid)=>scoped209(uid)+'_meta';
+function localMeta209(uid){try{return JSON.parse(localStorage.getItem(LOCAL_META209(uid))||'null')}catch{return null}}
+function persistMeta209(uid){localStorage.setItem(LOCAL_META209(uid),JSON.stringify({revision:revision209,dirty:dirty209}))}
+function queueSync209(delay=1200){clearTimeout(autoSync209Timer);if(current209&&autoSync209Enabled)autoSync209Timer=setTimeout(()=>sync209(),delay)}
+const scoped209=(uid)=>'soquy2093_user_'+uid;
+const blank209=()=>({schemaVersion:2,funds:[{id:'f1',name:'Cá nhân',scope:'personal'}],accounts:[{id:'a1',name:'Tiền mặt',kind:'cash',openingBalance:0,liquid:true},{id:'a2',name:'Ngân hàng',kind:'bank',openingBalance:0,liquid:true}],tx:[],codes:[],partners:[],debts:[],investments:[]});
+function config209(){try{return JSON.parse(localStorage.getItem(AUTH209_CONFIG)||'null')}catch{return null}}
+function msg209(s){document.getElementById('auth209status').textContent=s}
+function status209(s){document.getElementById('sync209status').textContent=' · '+s}
+function auth209SaveConfig(){const url=document.getElementById('auth209url').value.trim().replace(/\/+$/,'').toLowerCase(),key=document.getElementById('auth209key').value.trim();if(url!==AUTH209_URL)return msg209('URL không khớp dự án Sổ Quỹ.');if(!key||key.startsWith('sb_secret_')||key.includes('service_role'))return msg209('Chỉ sử dụng publishable/anon key.');localStorage.setItem(AUTH209_CONFIG,JSON.stringify({url,key}));document.getElementById('auth209key').value='';msg209('Đã lưu cấu hình.')}
+const config209init=config209();if(config209init?.url)document.getElementById('auth209url').value=config209init.url;
+async function request209(path,method='GET',payload,token){const c=config209();if(!c?.key||c.url!==AUTH209_URL)throw Error('Chưa cấu hình Supabase đúng dự án');const h={apikey:c.key,'Content-Type':'application/json'};if(token)h.Authorization='Bearer '+token; if(method==='POST')h.Prefer='return=representation';if(method==='PATCH')h.Prefer='return=representation';const r=await fetch(c.url+path,{method,headers:h,body:payload===undefined?undefined:JSON.stringify(payload),cache:'no-store'});let d;try{d=await r.json()}catch{d=null}if(!r.ok)throw Error(d?.message||d?.msg||d?.error_description||d?.error||'HTTP '+r.status);return d}
+async function validToken209(){
+ if(!session209?.access_token)throw Error('Chưa đăng nhập');
+ const expiry=session209.expires_at||(session209.expires_in&&session209._issued_at+session209.expires_in);
+ if(expiry&&Date.now()/1000<expiry-90)return session209.access_token;
+ if(!session209.refresh_token)throw Error('Phiên đăng nhập đã hết hạn. Hãy đăng xuất và đăng nhập lại.');
+ const d=await request209('/auth/v1/token?grant_type=refresh_token','POST',{refresh_token:session209.refresh_token});
+ if(!d.access_token||d.user?.id&&d.user.id!==current209?.uid)throw Error('Không thể gia hạn phiên đăng nhập');
+ session209={...session209,...d,_issued_at:Math.floor(Date.now()/1000)};
+ localStorage.setItem(SESSION211,JSON.stringify(session209));
+ return session209.access_token;
+}
+async function auth209(action){const email=document.getElementById('auth209email').value.trim(),password=document.getElementById('auth209pass').value;if(!email||!password)return msg209('Vui lòng nhập email và mật khẩu.');if(!config209()?.key)return msg209('Hãy mở Cấu hình Supabase và lưu khóa trước.');try{msg209('Đang xác thực…');const path=action==='signup'?'/auth/v1/signup':'/auth/v1/token?grant_type=password';const signupPath=action==='signup'&&recoveryUrl212()?path+'?redirect_to='+encodeURIComponent(recoveryUrl212()):path;const d=await request209(signupPath,'POST',{email,password});if(!d.access_token){msg209('Đã đăng ký. Hãy xác nhận email rồi đăng nhập.');return}if(!d.user?.id)throw Error('Không xác định được UID tài khoản');session209={...d,_issued_at:Math.floor(Date.now()/1000)};await activate209(session209);localStorage.setItem(SESSION211,JSON.stringify(session209));document.getElementById('auth209pass').value=''}catch(e){session209=null;msg209('Lỗi: '+e.message)}}
+async function activate209(d){
+ const uid=d.user.id;
+ const saved=localStorage.getItem(scoped209(uid));let local=null;
+ try{local=saved?JSON.parse(saved):null}catch{}
+ const meta=localMeta209(uid);
+ let remote=[];let offline211=false;
+ try{remote=await request209('/rest/v1/finance_snapshots?user_id=eq.'+encodeURIComponent(uid)+'&select=user_id,revision,data&limit=1','GET',undefined,d.access_token)}catch(e){if(navigator.onLine)throw e;offline211=true;if(!local)throw Error('Chưa có dữ liệu lưu trên thiết bị để mở ngoại tuyến')} 
+ // Never replace a pending local change with a remote snapshot.
+ if(local&&meta?.dirty){db=SoQuyFinanceV2.migrateDb(local);revision209=Number(meta.revision)||0;dirty209=true;}
+ else if(remote.length){db=SoQuyFinanceV2.migrateDb(remote[0].data);revision209=Number(remote[0].revision);dirty209=false;localStorage.setItem(scoped209(uid),JSON.stringify(db));}
+ else if(local){db=SoQuyFinanceV2.migrateDb(local);revision209=Number(meta?.revision)||0;dirty209=!!meta?.dirty||!offline211;}
+ else{db=blank209();revision209=0;dirty209=false;}
+ persistMeta209(uid);
+ current209={uid,email:d.user.email||''};selectedAccount208='';editingTx208='';selectedFundId='';homeFund='';tab='overview';
+ document.getElementById('auth209').hidden=true;document.getElementById('account209').style.display='block';document.getElementById('account209email').textContent='👤 '+current209.email;render();status209(offline211?'Ngoại tuyến: dữ liệu đã lưu trên thiết bị':dirty209?'Có dữ liệu chờ đồng bộ':'Đã đăng nhập; dữ liệu theo UID');
+ queueSync209(350);
+}
+// Override old shared save() and disable all old background-sync calls.
+save=function(){if(!current209){alert('Vui lòng đăng nhập');return}localMutation++;localStorage.setItem(scoped209(current209.uid),JSON.stringify(db));dirty209=true;persistMeta209(current209.uid);render();status209('Có thay đổi chưa đồng bộ');queueSync209();};
+async function sync209(){
+ if(!current209||!session209||busy209)return;
+ if(!navigator.onLine)return status209('Ngoại tuyến: dữ liệu vẫn lưu trên máy');
+ busy209=true;const uid=current209.uid;
+ try{
+  status209('Đang đồng bộ…');
+  const token=await validToken209();
+  const rows=await request209('/rest/v1/finance_snapshots?user_id=eq.'+encodeURIComponent(uid)+'&select=revision,data&limit=1','GET',undefined,token);
+  if(uid!==current209?.uid)return;
+  if(!dirty209){
+   if(rows.length&&Number(rows[0].revision)!==revision209){
+    db=SoQuyFinanceV2.migrateDb(rows[0].data);revision209=Number(rows[0].revision);
+    localStorage.setItem(scoped209(uid),JSON.stringify(db));persistMeta209(uid);render();
+    status209('Đã nhận dữ liệu mới từ đám mây');
+   }else status209('Đã đồng bộ');
+   return;
+  }
+  if(rows.length&&Number(rows[0].revision)!==revision209){status209('XUNG ĐỘT: Giữ nguyên dữ liệu trên máy; chưa ghi đè. Hãy sao lưu JSON để đối chiếu.');return}
+  if(!rows.length&&revision209!==0){status209('Dữ liệu trên đám mây đã thay đổi; dừng tải lên để bảo vệ dữ liệu');return}
+  const snapshot=JSON.stringify(db),next=revision209+1;
+  let result;
+  if(rows.length){
+   result=await request209('/rest/v1/finance_snapshots?user_id=eq.'+encodeURIComponent(uid)+'&revision=eq.'+revision209,'PATCH',{revision:next,data:JSON.parse(snapshot),updated_at:new Date().toISOString()},token);
+  }else{
+   result=await request209('/rest/v1/finance_snapshots','POST',{user_id:uid,revision:next,data:JSON.parse(snapshot)},token);
+  }
+  if(!result?.length)throw Error('Xung đột phiên bản; chưa ghi dữ liệu');
+  revision209=next;
+  if(JSON.stringify(db)===snapshot)dirty209=false;
+  persistMeta209(uid);
+  status209(dirty209?'Đã gửi một phần; tiếp tục đồng bộ':'Đồng bộ thành công');
+  if(dirty209)queueSync209(1500);
+ }catch(e){status209('Chưa đồng bộ: '+e.message)}finally{busy209=false}
+}
+function auth209Logout(){if(busy209){alert('Đang đồng bộ, hãy chờ hoàn tất.');return}if(dirty209&&!confirm('Có dữ liệu chưa đồng bộ. Đăng xuất vẫn giữ dữ liệu trên thiết bị theo tài khoản này. Tiếp tục?'))return;clearTimeout(autoSync209Timer);localStorage.removeItem(SESSION211);current209=null;session209=null;db=blank209();selectedAccount208='';editingTx208='';selectedFundId='';homeFund='';tab='overview';document.getElementById('account209').style.display='none';document.getElementById('auth209').hidden=false;document.getElementById('auth209pass').value='';msg209('Đã đăng xuất. Dữ liệu cũ không hiển thị cho tài khoản khác.');render()}
+// Prevent the legacy global-session sync engine from being reused.
+cloudToken='';cloudRefreshToken='';cloudUser='';localStorage.removeItem('soquy_session_v131');
+window.addEventListener('online',()=>{if(current209)queueSync209(300)});
+window.addEventListener('focus',()=>{if(current209)queueSync209(300)});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&current209)queueSync209(300)});
+setInterval(()=>{if(current209&&!document.hidden&&navigator.onLine)queueSync209(100)},30000);
+// Restore a previously authenticated session only on this device. Explicit logout deletes it.
+async function restore211(){
+ let old;try{old=JSON.parse(localStorage.getItem(SESSION211)||'null')}catch{}
+ if(!old?.user?.id||!old?.refresh_token||!old?.access_token)return;
+ if(!config209()?.key)return;
+ try{
+  session209=old;
+  if(navigator.onLine){
+   // Refresh to validate the persisted identity, including expired access tokens.
+   const d=await request209('/auth/v1/token?grant_type=refresh_token','POST',{refresh_token:old.refresh_token});
+   if(!d.access_token||d.user?.id!==old.user.id)throw Error('Phiên đăng nhập không hợp lệ');
+   session209={...d,_issued_at:Math.floor(Date.now()/1000)};
+   localStorage.setItem(SESSION211,JSON.stringify(session209));
+  }
+  await activate209(session209);
+ }catch(e){
+  // Never use a failed online authentication as permission to open cached finance data.
+  if(navigator.onLine){localStorage.removeItem(SESSION211);session209=null;msg209('Vui lòng đăng nhập lại: '+e.message)}
+  else {session209=null;msg209('Không thể mở ngoại tuyến: '+e.message)}
+ }
+}
+async function changePassword211(){
+ if(!current209||!session209)return alert('Vui lòng đăng nhập');
+ if(!navigator.onLine)return alert('Cần có Internet để đổi mật khẩu');
+ const next=prompt('Nhập mật khẩu mới (ít nhất 8 ký tự):');
+ if(next===null)return;
+ if(next.length<8)return alert('Mật khẩu cần ít nhất 8 ký tự');
+ const confirmNext=prompt('Nhập lại mật khẩu mới:');
+ if(next!==confirmNext)return alert('Mật khẩu xác nhận không khớp');
+ try{const token=await validToken209();await request209('/auth/v1/user','PUT',{password:next},token);alert('Đã cập nhật mật khẩu. Hãy dùng mật khẩu mới ở lần đăng nhập sau.')}catch(e){alert('Không đổi được mật khẩu: '+e.message)}
+}
+async function forgot211(){
+ if(!navigator.onLine)return msg209('Cần có Internet để yêu cầu đặt lại mật khẩu.');
+ const email=document.getElementById('auth209email').value.trim();
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return msg209('Hãy nhập email đăng ký trước.');
+ if(!config209()?.key)return msg209('Hãy lưu cấu hình Supabase trước.');
+ const target=recoveryUrl212();if(!target)return msg209('Chưa thiết lập trang khôi phục. Hãy bấm Đường dẫn khôi phục mật khẩu trước.');try{await request209('/auth/v1/recover?redirect_to='+encodeURIComponent(target),'POST',{email});msg209('Nếu email đã đăng ký, hãy kiểm tra hộp thư và mở liên kết đặt lại mật khẩu.')}catch(e){msg209('Không gửi được email: '+e.message)}
+}
+restore211();
+</script></body></html>
