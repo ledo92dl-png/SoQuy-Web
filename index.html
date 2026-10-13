@@ -394,38 +394,93 @@ async function activate209(d){
 }
 // Override old shared save() and disable all old background-sync calls.
 save=function(){if(!current209){alert('Vui lòng đăng nhập');return}localMutation++;localStorage.setItem(scoped209(current209.uid),JSON.stringify(db));dirty209=true;persistMeta209(current209.uid);render();status209('Có thay đổi chưa đồng bộ');queueSync209();};
+
+// Sổ Quỹ 2.1.2 Beta - manual conflict review (all records, one confirmation)
+let conflictReview213=null;
+const conflictFields213=['funds','accounts','tx','codes','partners','debts','investments'];
+function stable213(x){return JSON.stringify(x,Object.keys(x||{}).sort())}
+function conflictRows213(local,remote){
+ const out=[];
+ for(const field of conflictFields213){
+  const lm=new Map((local[field]||[]).map(x=>[String(x.id),x]));
+  const rm=new Map((remote[field]||[]).map(x=>[String(x.id),x]));
+  for(const id of new Set([...lm.keys(),...rm.keys()])){
+   const a=lm.get(id),b=rm.get(id);
+   out.push({field,id,a,b,different:!!a&&!!b&&stable213(a)!==stable213(b),choice:!!a&&!!b&&stable213(a)!==stable213(b)?'':'both'});
+  }
+ }
+ return out;
+}
+function describe213(x,field){
+ if(!x)return 'Không có trên thiết bị này';
+ if(field==='tx')return [x.date,typeLabel(x.type),x.category||x.content||'',money(x.amount),x.note||'',x.fund||'',x.account||''].filter(Boolean).join(' · ');
+ return [x.name||x.partnerName||x.code||x.id,x.openingBalance!=null?money(x.openingBalance):'',x.principal!=null?money(x.principal):'',x.currentValue!=null?money(x.currentValue):''].filter(Boolean).join(' · ');
+}
+function showConflict213(remote,local,mutation){
+ const existing=conflictReview213;
+ if(existing&&existing.uid===current209?.uid&&existing.revision===Number(remote.revision)&&existing.mutation===mutation)return;
+ conflictReview213={uid:current209.uid,revision:Number(remote.revision),remote:structuredClone(remote.data),local:structuredClone(local),mutation,rows:conflictRows213(local,remote.data)};
+ drawConflict213();
+}
+function drawConflict213(){
+ const c=conflictReview213;if(!c)return;
+ let el=document.getElementById('conflict213');
+ if(!el){el=document.createElement('div');el.id='conflict213';document.body.appendChild(el)}
+ el.style.cssText='position:fixed;inset:0;z-index:100000;background:#f4f7f5;overflow:auto;padding:14px';
+ const needs=c.rows.filter(x=>x.different).length,chosen=c.rows.filter(x=>x.different&&x.choice).length;
+ el.innerHTML=`<div style="max-width:1050px;margin:auto"><h2>⚠️ Đối chiếu toàn bộ dữ liệu</h2><p>Hiển thị ${c.rows.length} mục trên PC và đám mây, trong đó ${needs} mục có cùng ID nhưng khác nội dung. Các mục chỉ có ở một bên được giữ lại mặc định.</p><p><b>Đã lựa chọn ${chosen}/${needs} mục xung đột.</b> Không có dữ liệu nào được ghi lên đám mây trước khi bấm Xác nhận.</p><div class="card scroll"><table><thead><tr><th>Loại / ID</th><th>Dữ liệu trên thiết bị</th><th>Dữ liệu đám mây</th><th>Phương án</th></tr></thead><tbody>${c.rows.map((r,i)=>`<tr><td><b>${esc(r.field)}</b><br><small>${esc(r.id)}</small></td><td>${esc(describe213(r.a,r.field))}</td><td>${esc(describe213(r.b,r.field))}</td><td>${r.different?`<select aria-label="Chọn phương án cho mục ${i}" onchange="chooseConflict213(${i},this.value)"><option value="">-- Chọn --</option><option value="local" ${r.choice==='local'?'selected':''}>Giữ thiết bị</option><option value="remote" ${r.choice==='remote'?'selected':''}>Giữ đám mây</option><option value="both" ${r.choice==='both'?'selected':''}>Giữ cả hai</option><option value="later" ${r.choice==='later'?'selected':''}>Xử lý sau</option></select>`:'<small>Giữ nguyên / hợp nhất</small>'}</td></tr>`).join('')}</tbody></table></div><div class="card"><p><b>Lưu ý:</b> “Giữ cả hai” tạo một bản sao có ID mới; với giao dịch thu/chi, số dư sẽ tính cả hai lần. Các mục “Xử lý sau” không được đưa vào lần đồng bộ này.</p><div class="toolbar"><button id="confirm213" ${chosen!==needs?'disabled':''} onclick="confirmConflict213()">Xác nhận đồng bộ một lần</button><button class="alt" onclick="closeConflict213()">Đóng, chưa đồng bộ</button></div><p id="conflict213msg" role="status"></p></div></div>`;
+}
+function chooseConflict213(i,value){if(!conflictReview213?.rows[i])return;conflictReview213.rows[i].choice=value;drawConflict213()}
+function closeConflict213(){document.getElementById('conflict213')?.remove();conflictReview213=null;status209('Đang chờ người dùng đối chiếu; chưa ghi đè')}
+async function confirmConflict213(){
+ const c=conflictReview213;if(!c||busy209)return;
+ const msg=document.getElementById('conflict213msg');
+ if(c.rows.some(x=>x.different&&!x.choice))return;
+ if(c.rows.some(x=>x.choice==='later')){msg.textContent='Vui lòng xử lý tất cả mục trước khi xác nhận. Các mục để sau sẽ được giữ nguyên, chưa đồng bộ.';return}
+ if(!current209||current209.uid!==c.uid||localMutation!==c.mutation){msg.textContent='Dữ liệu trên thiết bị đã thay đổi. Hãy đóng bảng và đồng bộ lại để đối chiếu mới.';return}
+ busy209=true;
+ try{
+  const token=await validToken209();
+  const rows=await request209('/rest/v1/finance_snapshots?user_id=eq.'+encodeURIComponent(c.uid)+'&select=revision,data&limit=1','GET',undefined,token);
+  if(!rows.length||Number(rows[0].revision)!==c.revision||stable213(rows[0].data)!==stable213(c.remote))throw Error('Dữ liệu đám mây đã thay đổi. Cần đối chiếu lại, chưa ghi đè.');
+  if(localMutation!==c.mutation)throw Error('Dữ liệu trên thiết bị vừa thay đổi. Cần đối chiếu lại.');
+  const merged={schemaVersion:2};for(const field of conflictFields213)merged[field]=[];
+  for(const r of c.rows){
+   if(!r.different){if(r.a||r.b)merged[r.field].push(structuredClone(r.a||r.b));continue}
+   if(r.choice==='local')merged[r.field].push(structuredClone(r.a));
+   else if(r.choice==='remote')merged[r.field].push(structuredClone(r.b));
+   else if(r.choice==='both'){
+    merged[r.field].push(structuredClone(r.b));
+    const duplicate=structuredClone(r.a);duplicate.id=id();merged[r.field].push(duplicate);
+   }
+  }
+  const snapshot=SoQuyFinanceV2.migrateDb(merged);
+  const result=await request209('/rest/v1/finance_snapshots?user_id=eq.'+encodeURIComponent(c.uid)+'&revision=eq.'+c.revision,'PATCH',{revision:c.revision+1,data:snapshot,updated_at:new Date().toISOString()},token);
+  if(!result?.length)throw Error('Có thiết bị vừa cập nhật đám mây. Chưa ghi đè, hãy đối chiếu lại.');
+  revision209=c.revision+1;
+  if(localMutation===c.mutation){db=snapshot;dirty209=false;localStorage.setItem(scoped209(c.uid),JSON.stringify(db));}
+  else{dirty209=true;}
+  persistMeta209(c.uid);document.getElementById('conflict213')?.remove();conflictReview213=null;render();status209('Đã xác nhận và đồng bộ dữ liệu đối chiếu');if(dirty209)queueSync209();
+ }catch(e){const el=document.getElementById('conflict213msg');if(el)el.textContent='Chưa lưu: '+e.message;status209('Chưa đồng bộ: '+e.message)}finally{busy209=false}
+}
 async function sync209(){
- if(!current209||!session209||busy209)return;
+ if(!current209||!session209||busy209||conflictReview213)return;
  if(!navigator.onLine)return status209('Ngoại tuyến: dữ liệu vẫn lưu trên máy');
  busy209=true;const uid=current209.uid;
  try{
-  status209('Đang đồng bộ…');
-  const token=await validToken209();
+  status209('Đang đồng bộ…');const token=await validToken209();
   const rows=await request209('/rest/v1/finance_snapshots?user_id=eq.'+encodeURIComponent(uid)+'&select=revision,data&limit=1','GET',undefined,token);
   if(uid!==current209?.uid)return;
   if(!dirty209){
-   if(rows.length&&Number(rows[0].revision)!==revision209){
-    db=SoQuyFinanceV2.migrateDb(rows[0].data);revision209=Number(rows[0].revision);
-    localStorage.setItem(scoped209(uid),JSON.stringify(db));persistMeta209(uid);render();
-    status209('Đã nhận dữ liệu mới từ đám mây');
-   }else status209('Đã đồng bộ');
-   return;
+   if(rows.length&&Number(rows[0].revision)!==revision209){db=SoQuyFinanceV2.migrateDb(rows[0].data);revision209=Number(rows[0].revision);localStorage.setItem(scoped209(uid),JSON.stringify(db));persistMeta209(uid);render();status209('Đã nhận dữ liệu mới từ đám mây')}
+   else status209('Đã đồng bộ');return;
   }
-  if(rows.length&&Number(rows[0].revision)!==revision209){status209('XUNG ĐỘT: Giữ nguyên dữ liệu trên máy; chưa ghi đè. Hãy sao lưu JSON để đối chiếu.');return}
-  if(!rows.length&&revision209!==0){status209('Dữ liệu trên đám mây đã thay đổi; dừng tải lên để bảo vệ dữ liệu');return}
-  const snapshot=JSON.stringify(db),next=revision209+1;
-  let result;
-  if(rows.length){
-   result=await request209('/rest/v1/finance_snapshots?user_id=eq.'+encodeURIComponent(uid)+'&revision=eq.'+revision209,'PATCH',{revision:next,data:JSON.parse(snapshot),updated_at:new Date().toISOString()},token);
-  }else{
-   result=await request209('/rest/v1/finance_snapshots','POST',{user_id:uid,revision:next,data:JSON.parse(snapshot)},token);
-  }
+  if(rows.length&&Number(rows[0].revision)!==revision209){showConflict213(rows[0],db,localMutation);status209('Có xung đột: vui lòng đối chiếu toàn bộ dữ liệu');return}
+  if(!rows.length&&revision209!==0){status209('Đám mây không còn dữ liệu; dừng tải lên');return}
+  const mutation=localMutation,snapshot=JSON.stringify(db),next=revision209+1;
+  const result=rows.length?await request209('/rest/v1/finance_snapshots?user_id=eq.'+encodeURIComponent(uid)+'&revision=eq.'+revision209,'PATCH',{revision:next,data:JSON.parse(snapshot),updated_at:new Date().toISOString()},token):await request209('/rest/v1/finance_snapshots','POST',{user_id:uid,revision:next,data:JSON.parse(snapshot)},token);
   if(!result?.length)throw Error('Xung đột phiên bản; chưa ghi dữ liệu');
-  revision209=next;
-  if(JSON.stringify(db)===snapshot)dirty209=false;
-  persistMeta209(uid);
-  status209(dirty209?'Đã gửi một phần; tiếp tục đồng bộ':'Đồng bộ thành công');
-  if(dirty209)queueSync209(1500);
+  revision209=next;if(localMutation===mutation)dirty209=false;persistMeta209(uid);status209(dirty209?'Đã gửi một phần; tiếp tục đồng bộ':'Đồng bộ thành công');if(dirty209)queueSync209(1500);
  }catch(e){status209('Chưa đồng bộ: '+e.message)}finally{busy209=false}
 }
 function auth209Logout(){if(busy209){alert('Đang đồng bộ, hãy chờ hoàn tất.');return}if(dirty209&&!confirm('Có dữ liệu chưa đồng bộ. Đăng xuất vẫn giữ dữ liệu trên thiết bị theo tài khoản này. Tiếp tục?'))return;clearTimeout(autoSync209Timer);localStorage.removeItem(SESSION211);current209=null;session209=null;db=blank209();selectedAccount208='';editingTx208='';selectedFundId='';homeFund='';tab='overview';document.getElementById('account209').style.display='none';document.getElementById('auth209').hidden=false;document.getElementById('auth209pass').value='';msg209('Đã đăng xuất. Dữ liệu cũ không hiển thị cho tài khoản khác.');render()}
